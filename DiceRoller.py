@@ -811,7 +811,6 @@ def main():
 	options: Namespace = parser.parse_args();
 
 	if options.unit:
-		# unittest.main(argv=[sys.argv[0], ]);
 		test_suite: unittest.TestSuite = unittest.TestLoader().discover("tests");
 		runner: unittest.TextTestRunner = unittest.TextTestRunner();
 
