@@ -37,12 +37,9 @@ class Rdp:
 
 	def _eval_exp1(self, result: float):
 		"""Handle variables"""
-		temp_tok_type: TokenType = TokenType.NotToken;
-		temp_token: str = "";
-
 		if self.tok_type == TokenType.Variable:
-			temp_token = self.token;
-			temp_tok_type = self.tok_type;
+			temp_tok_type: TokenType = self.tok_type;
+			temp_token: str = self.token;
 
 			self._get_token();
 
@@ -64,13 +61,12 @@ class Rdp:
 
 	def _eval_exp2(self, result: float):
 		"""Handle addition and subtraction"""
-		op: str = "";
-		temp: float = 0.0;
-
 		result = self._eval_exp3(result);
-		op = self.token;
+		op: str = self.token;
 
 		while op == '+' or op == '-':
+			temp: float = 0.0;
+
 			self._get_token();
 
 			temp = self._eval_exp3(temp);
@@ -87,12 +83,11 @@ class Rdp:
 
 	def _eval_exp3(self, result: float):
 		"""Handle multiplication, division, and modulo"""
-		op: str = "";
 		temp: float = 0.0;
 
 		result = self._eval_exp4(result);
 
-		op = self.token;
+		op: str = self.token;
 		while op == '*' or op == '/' or op == '%':
 			self._get_token();
 
@@ -112,7 +107,6 @@ class Rdp:
 
 	def _eval_exp4(self, result: float):
 		"""Handle exponents"""
-		base: float = 0.0;
 		exp: float = 0.0;
 
 		result = self._eval_exp5(result);
@@ -122,7 +116,7 @@ class Rdp:
 
 			exp = self._eval_exp4(exp);
 
-			base = result;
+			base: float = result;
 
 			if exp == 0.0:
 				return 1.0;
@@ -223,10 +217,12 @@ class Rdp:
 	def _find_var(self, varname: str) -> float:
 		"""Get the value stored in a variable"""
 		if not varname.isalpha():
-			raise SyntaxError("Invalid variable name");
+			raise SyntaxError(f"Invalid variable name '{varname}'");
 		else:
-			# TODO handle KeyError
-			return self.vars[varname];
+			if varname in self.vars:
+				return self.vars[varname];
+			else:
+				raise SyntaxError(f"Variable '{varname}' referenced before assigning value");
 
 
 	def _putback(self) -> None:
