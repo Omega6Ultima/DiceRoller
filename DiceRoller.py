@@ -1,21 +1,20 @@
-import argparse
-import io
-import os
-import platform
-import random
+import argparse;
+import io;
+import os;
+import platform;
+import random;
 import re;
-import sys
-import threading
-from argparse import Namespace
-from io import StringIO
+import sys;
+import threading;
+import unittest;
+from argparse import Namespace;
+from io import StringIO;
 from typing import Callable, TextIO;
 
 import playsound3;
 
 import Rdp;
-import RollerUtils
-from Rdp import Rdp;
-from RollerUtils import *;
+import RollerUtils;
 
 # Tab character for use in f-strings
 Tab: str = "\t";
@@ -837,14 +836,14 @@ class DiceSetTest(unittest.TestCase):
 
 			self._common_asserts(result[0], dice_sides);
 
-			roll_counts: list[int] = [result[0][0].count(i) for i in range_incl(1, dice_sides)];
+			roll_counts: list[int] = [result[0][0].count(i) for i in RollerUtils.range_incl(1, dice_sides)];
 			diff_counts: list[int] = [abs(roll_counts[i] - roll_counts[i + 1]) for i in range(-1, dice_sides - 1)];
 
 			self.assertTrue(all([dc < (num_dice * 0.05) for dc in diff_counts]), msg=f"Difference between counts of dice rolls is greater than 5% from {num_dice}");
 
 
 	def test_add(self):
-		for i in range_incl(1, 20):
+		for i in RollerUtils.range_incl(1, 20):
 			result: list[tuple[list[int], int]] = DiceSet(1, 20, add=i).get_results();
 
 			self._common_asserts(result[0], 20);
@@ -853,7 +852,7 @@ class DiceSetTest(unittest.TestCase):
 
 
 	def test_sub(self):
-		for i in range_incl(1, 20):
+		for i in RollerUtils.range_incl(1, 20):
 			result: list[tuple[list[int], int]] = DiceSet(1, 20, add=-i).get_results();
 
 			self._common_asserts(result[0], 20);
@@ -862,7 +861,7 @@ class DiceSetTest(unittest.TestCase):
 
 
 	def test_mul(self):
-		for i in range_incl(1, 20):
+		for i in RollerUtils.range_incl(1, 20):
 			result: list[tuple[list[int], int]] = DiceSet(1, 20, mul=i).get_results();
 
 			self.assertEqual(len(result), i, msg=f"Number of sets of dice is not equal to mul mod {i}, is incorrect value of {len(result)}");
@@ -874,7 +873,7 @@ class DiceSetTest(unittest.TestCase):
 	def test_reroll(self):
 		num_dice: int = 1000;
 
-		for i in range_incl(1, 20):
+		for i in RollerUtils.range_incl(1, 20):
 			result: list[tuple[list[int], int]] = DiceSet(num_dice, 20, reroll=f"{i}").get_results();
 
 			self._common_asserts(result[0], 20);
@@ -887,7 +886,7 @@ class DiceSetTest(unittest.TestCase):
 	def test_reroll_cond(self):
 		num_dice: int = 1000;
 
-		for i in range_incl(2, 20):
+		for i in RollerUtils.range_incl(2, 20):
 			result: list[tuple[list[int], int]] = DiceSet(num_dice, 20, reroll=f"<{i}").get_results();
 
 			self._common_asserts(result[0], 20);
@@ -896,7 +895,7 @@ class DiceSetTest(unittest.TestCase):
 
 			self.assertFalse(any([r < i for r in result[0][0]]), msg=f"Reroll mod of {{{i}}} resulted in roll of <{i}");
 
-		for i in range_incl(2, 19):
+		for i in RollerUtils.range_incl(2, 19):
 			result: list[tuple[list[int], int]] = DiceSet(num_dice, 20, reroll=f">={i}").get_results();
 
 			self._common_asserts(result[0], 20);
@@ -909,7 +908,7 @@ class DiceSetTest(unittest.TestCase):
 	def test_remove(self):
 		num_dice: int = 1000;
 
-		for i in range_incl(1, 20):
+		for i in RollerUtils.range_incl(1, 20):
 			result: list[tuple[list[int], int]] = DiceSet(1000, 20, remove=f"{i}").get_results();
 
 			self._common_asserts(result[0], 20);
@@ -922,7 +921,7 @@ class DiceSetTest(unittest.TestCase):
 	def test_remove_cond(self):
 		num_dice: int = 1000;
 
-		for i in range_incl(2, 20):
+		for i in RollerUtils.range_incl(2, 20):
 			result: list[tuple[list[int], int]] = DiceSet(1000, 20, remove=f"<{i}").get_results();
 
 			self._common_asserts(result[0], 20);
@@ -931,7 +930,7 @@ class DiceSetTest(unittest.TestCase):
 
 			self.assertFalse(any([r < i for r in result[0][0]]), msg=f"Remove mod of {{{i}}} resulted in roll of <{i}");
 
-		for i in range_incl(2, 19):
+		for i in RollerUtils.range_incl(2, 19):
 			result: list[tuple[list[int], int]] = DiceSet(1000, 20, remove=f">={i}").get_results();
 
 			self._common_asserts(result[0], 20);
