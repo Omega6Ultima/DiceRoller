@@ -6,13 +6,22 @@ class Rdp:
 	# Pattern for detecting math expression parsable by the parser
 	# Not perfect but good enough to help filter
 	MathPattern: re.Pattern = re.compile(r"""^			# Beginning of input
+												\(*				# Open parenthesis
+												\s*
 												\d+(?:\.\d+)?	# Int or float
+												\s*
 												(?:
+												\s*
 												[-+*/%^]		# Math operators
-												\(?				# Open parenthesis
+												\s*
+												\(*				# Open parenthesis
+												\s*
 												\d+(?:\.\d+)?	# Int or float
+												\s*
+												\)*				# Close parenthesis
+												\s*
 												)*
-												\)?				# Close parenthesis
+												\s*
 												""", re.X);
 
 	class TokenType(enum.Enum):
