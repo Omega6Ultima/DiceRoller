@@ -1,21 +1,41 @@
 import enum;
-
-
-class TokenType(enum.Enum):
-	NotToken = 0;
-	Delimiter = 1;
-	Variable = 2;
-	Number = 3;
+import re;
 
 
 class Rdp:
+	# Pattern for detecting math expression parsable by the parser
+	# Not perfect but good enough to help filter
+	MathPattern: re.Pattern = re.compile(r"""^			# Beginning of input
+												\d+(?:\.\d+)?	# Int or float
+												(?:
+												[-+*/%^]		# Math operators
+												\(?				# Open parenthesis
+												\d+(?:\.\d+)?	# Int or float
+												)*
+												\)?				# Close parenthesis
+												""", re.X);
+
+	class TokenType(enum.Enum):
+		NotToken = 0;
+		Delimiter = 1;
+		Variable = 2;
+		Number = 3;
+
 	"""A recursive descent parser adapted from a C++ example"""
 	def __init__(self):
 		self.exp: str = "";
 		self.index: int = 0;
 		self.token: str = "";
-		self.tok_type: TokenType = TokenType.NotToken;
+		self.tok_type: Rdp.TokenType = Rdp.TokenType.NotToken;
 		self.vars: dict[str, float] = {};
+
+
+	@staticmethod
+	def is_math(text: str) -> bool:
+		if Rdp.MathPattern.fullmatch(text):
+			return True;
+
+		return False;
 
 
 	def eval_exp(self, expression: str) -> float:
@@ -36,8 +56,8 @@ class Rdp:
 
 	def _eval_exp1(self, result: float):
 		"""Handle variables"""
-		if self.tok_type == TokenType.Variable:
-			temp_tok_type: TokenType = self.tok_type;
+		if self.tok_type == Rdp.TokenType.Variable:
+			temp_tok_type: Rdp.TokenType = self.tok_type;
 			temp_token: str = self.token;
 
 			self._get_token();
@@ -133,7 +153,7 @@ class Rdp:
 	def _eval_exp5(self, result: float):
 		op: str = "";
 
-		if self.tok_type == TokenType.Delimiter and (self.token == '+' or self.token == '-'):
+		if self.tok_type == Rdp.TokenType.Delimiter and (self.token == '+' or self.token == '-'):
 			op = self.token;
 			self._get_token();
 
@@ -163,11 +183,11 @@ class Rdp:
 
 	def _atom(self):
 		"""Convert tokens into values"""
-		if self.tok_type == TokenType.Variable:
+		if self.tok_type == Rdp.TokenType.Variable:
 			result = self._find_var(self.token);
 			self._get_token();
 			return result;
-		elif self.tok_type == TokenType.Number:
+		elif self.tok_type == Rdp.TokenType.Number:
 			result = float(self.token);
 			self._get_token();
 			return result;
@@ -178,7 +198,7 @@ class Rdp:
 	def _get_token(self):
 		"""Get the next token in the expression"""
 		temp: str = "";
-		self.tok_type: TokenType = TokenType.NotToken;
+		self.tok_type: Rdp.TokenType = Rdp.TokenType.NotToken;
 
 		if self.index >= len(self.exp):
 			return;
@@ -187,19 +207,19 @@ class Rdp:
 			self.index += 1;
 
 		if self.exp[self.index] in "+-*/%^=()":
-			self.tok_type = TokenType.Delimiter;
+			self.tok_type = Rdp.TokenType.Delimiter;
 			temp += self.exp[self.index];
 			self.index += 1;
 		elif self.exp[self.index].isalpha():
 			while self.index < len(self.exp) and not self.is_delimiter(self.exp[self.index]):
 				temp += self.exp[self.index];
 				self.index += 1;
-			self.tok_type = TokenType.Variable;
+			self.tok_type = Rdp.TokenType.Variable;
 		elif self.exp[self.index].isdigit():
 			while self.index < len(self.exp) and not self.is_delimiter(self.exp[self.index]):
 				temp += self.exp[self.index];
 				self.index += 1;
-			self.tok_type = TokenType.Number;
+			self.tok_type = Rdp.TokenType.Number;
 
 		self.token = temp;
 
