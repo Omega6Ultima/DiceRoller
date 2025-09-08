@@ -1,5 +1,7 @@
 import argparse;
+import dotenv;
 import io;
+import logging;
 import os;
 import platform;
 import random;
@@ -7,10 +9,12 @@ import re;
 import sys;
 import threading;
 import unittest;
-from argparse import Namespace;
+
+# Used for type hints
 from io import StringIO;
 from typing import Callable, TextIO;
 
+import discord;
 import playsound3;
 
 import Rdp;
@@ -132,7 +136,7 @@ class DiceSet:
 	ValidComparisons: list[str] = ["<=", ">=", "<", ">"];
 	DicePattern: re.Pattern = re.compile(r"""(\d+\*)?            		# optional multiplier
 											\d+(?:\.\d+)?               		# number of dice
-											d
+											[dD]
 											\d+                         		# number of sides
 											([+-]\d+)?                  		# optional add/sub
 											(?:									# one of (or none)
@@ -209,6 +213,8 @@ class DiceSet:
 	@classmethod
 	def from_str(cls, text: str) -> "DiceSet":
 		"""Parse the passed string and return a DiceSet constructed from the string"""
+		text = text.lower();
+
 		if DiceSet.is_dice(text):
 			num_dice: str = text[:text.find("d")];
 			dice_side: str = text[text.find("d") + 1:];
@@ -249,6 +255,10 @@ class DiceSet:
 
 	@staticmethod
 	def is_dice(text: str) -> bool:
+		# Remove any spaces first to simply regex
+		text = text.replace(" ", "");
+
+
 		if DiceSet.DicePattern.fullmatch(text):
 			return True;
 
@@ -350,7 +360,10 @@ class DiceSet:
 
 		if self.sub_dice:
 			for dice in self.sub_dice:
-				builder.append(f", {str(dice)}");
+				dice_str: str = str(dice);
+
+				# Remove subdice total and equal sign
+				builder.append(f", {dice_str[:dice_str.find("=") - 1]}");
 
 		builder.append(f" = {int(self)}");
 
@@ -498,7 +511,7 @@ class Dicemode:
 			if not diceset.verify_dice(die_sides):
 				self.done = True;
 
-				print(f"Using dicemode {self.name} with non-d{die_sides}, dice passed are {diceset.dice_sides}", file=self.output);
+				print(f"Using dicemode {self.name} with non-d{die_sides}, dice passed are d{diceset.dice_sides}", file=self.output);
 		elif clean_action.startswith("roll("):
 			args: list[str] = self._collect_args(clean_action);
 			result: list[tuple[list[int], int]] = [];
@@ -744,16 +757,36 @@ class Dicemode:
 			print(f"{var} = {mode_vars[var]}", file=self.output);
 
 
-def get_help(context: str = "") -> None:
+class AppState(dict):
+	def __init__(self):
+		super().__init__();
+
+
+def get_help(app_state: AppState, context: str = "") -> str:
+	# Special case, tailor help to discord specific help
+	if app_state["options"].mode == "discord" and context == "":
+		context = "discord";
+
 	match context:
 		case "dicemode" | "dicemodes":
-			print(DicemodeHelpStr);
+			return DicemodeHelpStr;
+		case "discord":
+			return DiscordHelpStr;
 		case _:
-			print(HelpStr);
+			return HelpStr;
 
 
-def start_timer(seconds: str, sound: str = "alarm-clock-1.wav") -> None:
+def start_timer(app_state: AppState, seconds: str, sound: str = "alarm-clock-1.wav") -> None:
 	SoundTimer(int(seconds), sound);
+
+
+def switch_dicemode(app_state: AppState, mode: str) -> str:
+	if mode in app_state["dicemodes"]:
+		app_state["dicemode"] = mode;
+
+		return f"Switching to {mode}";
+	else:
+		return f"No dicemode named '{mode}'";
 
 
 HelpStr: str = f"""
@@ -764,17 +797,28 @@ quit{Tab * 5}quit the program
 timer <sec> [sound]{Tab * 2}start a timer for <sec> seconds and with [sound]
 clear{Tab * 5}clear the output
 coin{Tab * 5}toss a coin
+dicemodes{Tab * 4}list available dicemodes
 dicemode <mode>{Tab * 3}switch to <mode> dicemode, all subsequent rolls with be processed through that dicemode
-1d4{Tab * 6}roll a 1d4
-1d6+1{Tab * 5}roll a 1d6 and add 1
-1d8-3{Tab * 5}roll a 1d8 and subtract 3
-3*1d10+2{Tab * 4}roll 3 sets of 1d10+2
-6d12{{1}}{Tab * 5}roll 6d12 and reroll any 1's
-6d12{{<6}}{Tab * 4}roll 6d12 and reroll any matching the condition
-6d12{{low}}{Tab * 4}roll 6d12 and reroll the lowest roll
-3d20[20]{Tab * 4}roll 3d20 and remove any and all 20's
-3d20[>=16]{Tab * 4}roll 3d20 and remove any rolls matching the condition
-3d20[low]{Tab * 4}roll 3d20 and remove the lowest roll
+Dice rolls:
+{Tab}1d4{Tab * 5}roll a 1d4
+{Tab}1d6+1{Tab * 4}roll a 1d6 and add 1
+{Tab}1d8-3{Tab * 4}roll a 1d8 and subtract 3
+{Tab}3*1d10+2{Tab * 3}roll 3 sets of 1d10+2
+{Tab}6d12{{1}}{Tab * 4}roll 6d12 and reroll any 1's
+{Tab}6d12{{<6}}{Tab * 3}roll 6d12 and reroll any matching the condition
+{Tab}6d12{{low}}{Tab * 3}roll 6d12 and reroll the lowest roll
+{Tab}3d20[20]{Tab * 3}roll 3d20 and remove any and all 20's
+{Tab}3d20[>=16]{Tab * 3}roll 3d20 and remove any rolls matching the condition
+{Tab}3d20[low]{Tab * 3}roll 3d20 and remove the lowest roll
+Math expressions:
+{Tab}10 + 14{Tab * 3}addition
+{Tab}54 - 19{Tab * 3}subtraction
+{Tab}4 * 8{Tab * 4}multiplication
+{Tab}27 / 9{Tab * 3}division
+{Tab}50 % 4{Tab * 3}modulo (division remainder)
+{Tab}2 ^ 3{Tab * 3}exponents
+{Tab}3 * ( 2 + 7 ){Tab}parenthesis
+{Tab}
 """;
 DicemodeHelpStr: str = f"""
 dicemode actions:
@@ -795,41 +839,45 @@ print(damage){Tab}print "damage = <value of damage>"
 Example dicemode:
 {DefaultDicemodes['10_again']}
 """;
+DiscordHelpStr: str = f"""
+help <context>{Tab * 3}get help with topic
+coin{Tab * 5}toss a coin
+dicemodes{Tab * 4}list available dicemodes
+dicemode <mode>{Tab * 3}switch to <mode> dicemode, all subsequent rolls with be processed through that dicemode
+Dice rolls:
+{Tab}1d4{Tab * 5}roll a 1d4
+{Tab}1d6+1{Tab * 4}roll a 1d6 and add 1
+{Tab}1d8-3{Tab * 4}roll a 1d8 and subtract 3
+{Tab}3\\*1d10+2{Tab * 3}roll 3 sets of 1d10+2
+{Tab}6d12{{1}}{Tab * 4}roll 6d12 and reroll any 1's
+{Tab}6d12{{<6}}{Tab * 3}roll 6d12 and reroll any matching the condition
+{Tab}6d12{{low}}{Tab * 3}roll 6d12 and reroll the lowest roll
+{Tab}3d20[20]{Tab * 3}roll 3d20 and remove any and all 20's
+{Tab}3d20[>=16]{Tab * 3}roll 3d20 and remove any rolls matching the condition
+{Tab}3d20[low]{Tab * 3}roll 3d20 and remove the lowest roll
+Math expressions:
+{Tab}10 + 14{Tab * 3}addition
+{Tab}54 - 19{Tab * 3}subtraction
+{Tab}4 \\* 8{Tab * 4}multiplication
+{Tab}27 / 9{Tab * 3}division
+{Tab}50 % 4{Tab * 3}modulo (division remainder)
+{Tab}2 ^ 3{Tab * 3}exponents
+{Tab}3 \\* ( 2 + 7 ){Tab}parenthesis
+{Tab}
+""";
 Commands: dict[str, Callable] = {
 	"help": get_help,
 	"timer": start_timer,
-	"clear": lambda: os.system("cls") if "win" in platform.system().lower() else os.system("clear"),
-	"coin": lambda: print("Heads(1)" if int(DiceSet(1, 2)) == 1 else "Tails(2)"),
+	"dicemodes": lambda state: ", ".join(state["dicemodes"].keys()),
+	"dicemode": switch_dicemode,
+	"clear": lambda state: os.system("cls") if "win" in platform.system().lower() else os.system("clear"),
+	"coin": lambda state: "Heads(1)" if int(DiceSet(1, 2)) == 1 else "Tails(2)",
 };
 
 
-def main():
-	parser = argparse.ArgumentParser(description="A utility packed dice roller and calculator");
-	parser.add_argument("-u", "--unit", action="store_true", default=False, help="Run all unit tests");
-	parser.add_argument("-d", "--debug", action="store_true", default=False, help="Run in dicemode debug mode");
-	parser.add_argument("-l", "--load", nargs="*", help="Load an additional dicemode file");
-	options: Namespace = parser.parse_args();
-
-	if options.unit:
-		test_suite: unittest.TestSuite = unittest.TestLoader().discover("tests");
-		runner: unittest.TextTestRunner = unittest.TextTestRunner();
-
-		runner.run(test_suite);
-
-		exit(0);
-
-	if not os.path.isfile(DefaultDicemodeFile):
-		with open(DefaultDicemodeFile, "w") as outfile:
-			for mode in DefaultDicemodes:
-				outfile.write(DefaultDicemodes[mode].lstrip());
-
-	rdp: Rdp.Rdp = Rdp.Rdp();
-	dicemodes: dict[str, Dicemode] = {};
-	active_dicemode: str = "";
-	done: bool = False;
-
-	with open(DefaultDicemodeFile, "r") as mode_file:
-		cur_mode: str = "";
+def load_dicemodes(filename: str, dicemodes: dict[str, Dicemode]) -> None:
+	with open(filename, "r") as mode_file:
+		parsing_mode: str = "";
 		mode_actions: list[str] = [];
 
 		for line in mode_file:
@@ -837,55 +885,151 @@ def main():
 			line = line.rstrip();
 
 			if line.startswith("dicemode("):
-				if cur_mode:
-					dicemodes[cur_mode] = Dicemode(cur_mode, mode_actions);
+				if parsing_mode:
+					dicemodes[parsing_mode] = Dicemode(parsing_mode, mode_actions);
 					mode_actions.clear();
 
-				cur_mode = line.removeprefix("dicemode").strip("():");
-				# mode_actions.append(line);
+				parsing_mode = line.removeprefix("dicemode").strip("():");
 			elif line.strip() == "":
-				dicemodes[cur_mode] = Dicemode(cur_mode, mode_actions);
-				cur_mode = "";
+				dicemodes[parsing_mode] = Dicemode(parsing_mode, mode_actions);
+				parsing_mode = "";
 				mode_actions.clear();
 			else:
 				# Remove single tab from actions to align outer actions with no indent level
 				mode_actions.append(line.replace("    ", "\t").removeprefix("\t"));
 
-		if cur_mode:
-			dicemodes[cur_mode] = Dicemode(cur_mode, mode_actions);
+		if parsing_mode:
+			dicemodes[parsing_mode] = Dicemode(parsing_mode, mode_actions);
 
-	while not done:
-		prompt: str = input("Enter commands, dice, or math: ").strip();
 
-		if prompt == "exit" or prompt == "stop" or prompt == "quit":
-			done = True;
-		elif prompt.startswith("dicemode "):
-			# Process dicemode
-			dicemode = prompt.removeprefix("dicemode").strip();
+def process_input(text_in: str, app_state: AppState) -> str:
+	output: str = "";
 
-			if dicemode in dicemodes:
-				active_dicemode = dicemode;
-		elif any([prompt.startswith(key) for key in Commands]):
-			# Process commands
-			args: list[str] = prompt.split(" ");
+	if text_in == "exit" or text_in == "stop" or text_in == "quit":
+		app_state["done"] = True;
 
-			if len(args) == 1:
-				Commands[args[0]]();
-			else:
-				Commands[args[0]](*args[1:]);
-		elif DiceSet.is_dice(prompt):
-			# Process dice
-			if active_dicemode:
-				dicemodes[active_dicemode].run(prompt, options.debug);
-			else:
-				print(DiceSet.from_str(prompt));
+		output = "Exiting ...";
+	elif any([text_in.startswith(key) for key in Commands]):
+		# Process commands
+		args: list[str] = text_in.split(" ");
+		cmd_output: None | str;
+
+		if len(args) == 1:
+			cmd_output = Commands[args[0]](app_state);
 		else:
-			# Process math
-			try:
-				print(rdp.eval_exp(prompt));
-			except (SyntaxError, ZeroDivisionError) as e:
-				print(e);
+			cmd_output = Commands[args[0]](app_state, *args[1:]);
+
+		if cmd_output is not None:
+			output = cmd_output;
+	elif DiceSet.is_dice(text_in):
+		# Process dice
+		if app_state["dicemode"]:
+			dm_vars: dict[str, any] = app_state["dicemodes"][app_state["dicemode"]].run(text_in, app_state["options"].debug, capture_print=True);
+
+			output = dm_vars["output"];
+		else:
+			output = str(DiceSet.from_str(text_in));
+	elif Rdp.Rdp.is_math(text_in):
+		# Process math
+		try:
+			output = str(app_state["rdp"].eval_exp(text_in));
+		except (SyntaxError, ZeroDivisionError, OverflowError) as e:
+			output = str(e);
+	else:
+		output = f"Entered text '{text_in}' is not a command, dice, or math expression";
+
+	return output;
+
+
+def main() -> int:
+	app_state: AppState = AppState();
+
+	# Parse command line options
+	parser = argparse.ArgumentParser(prog=os.path.basename(sys.argv[0]).removesuffix(".py"), description="A utility packed dice roller and calculator");
+	parser.add_argument("-d", "--debug", action="store_true", default=False, help="Run in dicemode debug mode");
+	parser.add_argument("-l", "--load", nargs="*", help="Load an additional dicemode file");
+	parser.add_argument("-m", "--mode", choices=["unit", "active", "auto", "discord"], default="active", help="Run in unit testing mode, interactive mode, automation mode or discord mode");
+	parser.add_argument("-i", "--input", help="The input to process in auto mode, ignored in all other modes");
+
+	# Set up semi-global variables
+	app_state["options"] = parser.parse_args();
+	app_state["dicemode"] = "";
+	app_state["dicemodes"] = {};
+	app_state["rdp"] = Rdp.Rdp();
+	app_state["done"] = False;
+
+	# Are we running in unit mode?
+	if app_state["options"].mode == "unit":
+		test_suite: unittest.TestSuite = unittest.TestLoader().discover("tests");
+		runner: unittest.TextTestRunner = unittest.TextTestRunner();
+
+		runner.run(test_suite);
+
+		exit(0);
+
+	# Load dicemodes
+	if not os.path.isfile(DefaultDicemodeFile):
+		with open(DefaultDicemodeFile, "w") as outfile:
+			for mode in DefaultDicemodes:
+				outfile.write(DefaultDicemodes[mode].lstrip());
+
+	load_dicemodes(DefaultDicemodeFile, app_state["dicemodes"]);
+
+	if app_state["options"].load is not None:
+		for filename in app_state["options"].load:
+			load_dicemodes(filename, app_state["dicemodes"]);
+
+	# Select which main loop based on mode argument
+	if app_state["options"].mode == "active":
+		while not app_state["done"]:
+			prompt: str = input("Enter commands, dice, or math: ").strip();
+
+			output: str = process_input(prompt, app_state);
+
+			print(output);
+	elif app_state["options"].mode == "auto":
+		prompt: str = app_state["options"].input.strip();
+
+		output: str = process_input(prompt, app_state);
+
+		print(output);
+	elif app_state["options"].mode == "discord":
+		# File logger for discord log messages
+		log_handler = logging.FileHandler(filename="discord.log", encoding="utf-8", mode="w");
+
+		# Set up default intents and reading message content
+		intents = discord.Intents.default();
+		intents.message_content = True;
+
+		# Create discord client
+		client = discord.Client(intents=intents);
+
+
+		# Client event-driven functions
+		@client.event
+		async def on_ready() -> None:
+			print(f"Logged in as {client.user} (ID: {client.user.id})");
+
+
+		@client.event
+		async def on_message(message: discord.message.Message) -> None:
+			if message.author.id != client.user.id:
+				reply: str = process_input(message.content, app_state);
+
+				if reply:
+					await message.channel.send(reply);
+
+
+		# Load a .env file to get the secret stuff
+		dotenv.load_dotenv(".env");
+
+		# Run client
+		client.run(os.getenv("BOT_TOKEN"), log_handler=log_handler);
+
+	return 0;
 
 
 if __name__ == "__main__":
-	main();
+	return_code: int = main();
+
+	exit(return_code);
