@@ -2,26 +2,19 @@ import enum;
 import re;
 
 
+# TODO potentially handle comma'd numbers
 class Rdp:
 	# Pattern for detecting math expression parsable by the parser
 	# Not perfect but good enough to help filter
 	MathPattern: re.Pattern = re.compile(r"""^			# Beginning of input
-												\(*				# Open parenthesis
-												\s*
+												[(\[]*			# Open parenthesis
 												\d+(?:\.\d+)?	# Int or float
-												\s*
 												(?:
-												\s*
 												[-+*/%^]		# Math operators
-												\s*
-												\(*				# Open parenthesis
-												\s*
+												[(\[]*			# Open parenthesis
 												\d+(?:\.\d+)?	# Int or float
-												\s*
-												\)*				# Close parenthesis
-												\s*
+												[)\]]*			# Close parenthesis
 												)*
-												\s*
 												""", re.X);
 
 	class TokenType(enum.Enum):
@@ -41,6 +34,9 @@ class Rdp:
 
 	@staticmethod
 	def is_math(text: str) -> bool:
+		# Remove any spaces first to simply regex
+		text = text.replace(" ", "");
+
 		if Rdp.MathPattern.fullmatch(text):
 			return True;
 
@@ -184,6 +180,14 @@ class Rdp:
 				raise SyntaxError("Unbalanced parenthesis");
 
 			self._get_token();
+		elif self.token == "[":
+			self._get_token();
+			result = self._eval_exp2(result);
+
+			if not self.token == "]":
+				raise SyntaxError("Unbalanced square brackets");
+
+			self._get_token();
 		else:
 			result = self._atom();
 
@@ -215,7 +219,7 @@ class Rdp:
 		while self.exp[self.index].isspace():
 			self.index += 1;
 
-		if self.exp[self.index] in "+-*/%^=()":
+		if self.exp[self.index] in "+-*/%^=()[]":
 			self.tok_type = Rdp.TokenType.Delimiter;
 			temp += self.exp[self.index];
 			self.index += 1;
@@ -236,7 +240,7 @@ class Rdp:
 	@staticmethod
 	def is_delimiter(text: str) -> bool:
 		"""Determine if text is a delimiting character"""
-		if text in " +-*/%^=()" or text == 9 or text == '\r' or text == 0:
+		if text in " +-*/%^=()[]" or text == 9 or text == '\r' or text == 0:
 			return True;
 		else:
 			return False;
