@@ -1,4 +1,5 @@
 import enum;
+import math;
 import re;
 
 
@@ -145,7 +146,7 @@ class Rdp:
 
 			if exp == 0.0:
 				return 1.0;
-			elif exp > 1000.0:
+			elif exp > 10_000.0:
 				raise OverflowError("Exponent too large");
 
 			for _ in range(int(abs(exp) - 1)):
