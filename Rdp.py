@@ -3,16 +3,17 @@ import re;
 
 
 # TODO potentially handle comma'd numbers
+# TODO factorials
 class Rdp:
 	# Pattern for detecting math expression parsable by the parser
 	# Not perfect but good enough to help filter
 	MathPattern: re.Pattern = re.compile(r"""^			# Beginning of input
 												[(\[]*			# Open parenthesis
-												\d+(?:\.\d+)?	# Int or float
+												-?\d+(?:\.\d+)?	# Int or float
 												(?:
 												[-+*/%^]		# Math operators
 												[(\[]*			# Open parenthesis
-												\d+(?:\.\d+)?	# Int or float
+												-?\d+(?:\.\d+)?	# Int or float
 												[)\]]*			# Close parenthesis
 												)*
 												""", re.X);
@@ -144,6 +145,8 @@ class Rdp:
 
 			if exp == 0.0:
 				return 1.0;
+			elif exp > 1000.0:
+				raise OverflowError("Exponent too large");
 
 			for _ in range(int(abs(exp) - 1)):
 				result *= base;
