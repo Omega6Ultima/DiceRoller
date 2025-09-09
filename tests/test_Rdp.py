@@ -58,6 +58,16 @@ class TestRdp(unittest.TestCase):
 		self.assertEqual(self.rdp.eval_exp("-5 % -5"), 0);
 
 
+	def test_factorial(self):
+		self.assertEqual(self.rdp.eval_exp("1!"), 1);
+		self.assertEqual(self.rdp.eval_exp("0!"), 1);
+		self.assertEqual(self.rdp.eval_exp("3!"), 6);
+
+		self.assertEqual(self.rdp.eval_exp("-9!"), -362880);
+		self.assertEqual(self.rdp.eval_exp("5!"), 120);
+		self.assertEqual(self.rdp.eval_exp("-5!"), -120);
+
+
 	def test_pow(self):
 		self.assertEqual(self.rdp.eval_exp("1 ^ 2"), 1);
 		self.assertEqual(self.rdp.eval_exp("0 ^ 4"), 0);
@@ -80,6 +90,18 @@ class TestRdp(unittest.TestCase):
 		self.assertEqual(self.rdp.eval_exp("(4 + 5) * (6 - 2)"), 36);
 
 
+	def test_brackets(self):
+		self.assertEqual(self.rdp.eval_exp("5 - 7 * 3"), -16);
+		self.assertEqual(self.rdp.eval_exp("5 - [7 * 3]"), -16);
+		self.assertEqual(self.rdp.eval_exp("[5 - 7] * 3"), -6);
+
+		self.assertEqual(self.rdp.eval_exp("4 + 5 * 6 - 2"), 32);
+		self.assertEqual(self.rdp.eval_exp("4 + [5 * 6] - 2"), 32);
+		self.assertEqual(self.rdp.eval_exp("[4 + 5] * 6 - 2"), 52);
+		self.assertEqual(self.rdp.eval_exp("4 + 5 * [6 - 2]"), 24);
+		self.assertEqual(self.rdp.eval_exp("[4 + 5] * (6 - 2)"), 36);
+
+
 	def test_vars(self):
 		self.rdp.eval_exp("a = 2");
 		self.assertEqual(self.rdp.eval_exp("a * 4"), 8);
@@ -97,5 +119,14 @@ class TestRdp(unittest.TestCase):
 		with self.assertRaises(SyntaxError):
 			self.rdp.eval_exp("3 * (2");
 
+		with self.assertRaises(SyntaxError):
+			self.rdp.eval_exp("3 * [2");
+
+		with self.assertRaises(SyntaxError):
+			self.rdp.eval_exp("3 * [2)");
+
 		with self.assertRaises(ZeroDivisionError):
 			self.rdp.eval_exp("4 / 0");
+
+		with self.assertRaises(OverflowError):
+			self.rdp.eval_exp("4 ^ 20000");

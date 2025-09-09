@@ -4,7 +4,6 @@ import re;
 
 
 # TODO potentially handle comma'd numbers
-# TODO factorials
 class Rdp:
 	# Pattern for detecting math expression parsable by the parser
 	# Not perfect but good enough to help filter
@@ -16,6 +15,8 @@ class Rdp:
 												[(\[]*			# Open parenthesis
 												-?\d+(?:\.\d+)?	# Int or float
 												[)\]]*			# Close parenthesis
+												|
+												!
 												)*
 												""", re.X);
 
@@ -114,6 +115,14 @@ class Rdp:
 		result = self._eval_exp4(result);
 
 		op: str = self.token;
+
+		if op == "!":
+			if result == 0.0:
+				result = 1.0;
+			else:
+				for n in reversed(range(1, abs(int(result)))):
+					result *= n;
+
 		while op == '*' or op == '/' or op == '%':
 			self._get_token();
 
@@ -223,7 +232,7 @@ class Rdp:
 		while self.exp[self.index].isspace():
 			self.index += 1;
 
-		if self.exp[self.index] in "+-*/%^=()[]":
+		if self.exp[self.index] in "+-*/%!^=()[]":
 			self.tok_type = Rdp.TokenType.Delimiter;
 			temp += self.exp[self.index];
 			self.index += 1;
@@ -244,7 +253,7 @@ class Rdp:
 	@staticmethod
 	def is_delimiter(text: str) -> bool:
 		"""Determine if text is a delimiting character"""
-		if text in " +-*/%^=()[]" or text == 9 or text == '\r' or text == 0:
+		if text in " +-*/%!^=()[]" or text == 9 or text == '\r' or text == 0:
 			return True;
 		else:
 			return False;
