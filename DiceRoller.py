@@ -111,6 +111,7 @@ dicemode(Hero_kill):
 """,
 };
 
+
 class DiceError(Exception):
 	def __init__(self, text: str):
 		Exception.__init__(self, text);
@@ -174,11 +175,16 @@ class DiceSet:
 						self.reroll_mod = (comp, int(reroll.removeprefix(comp)));
 
 						break;
+			elif reroll == "low":
+				self.reroll_mod = ("low", 0);
+			elif reroll == "high":
+				self.reroll_mod = ("high", 0);
 			else:
 				raise DiceError(f"Invalid reroll modifier '{reroll}'");
 
-			if Comparisons[self.reroll_mod[0]](1, self.reroll_mod[1]) and Comparisons[self.reroll_mod[0]](self.dice_sides, self.reroll_mod[1]):
-				raise DiceError(f"Reroll modifier '{self.reroll_mod[0]}{self.reroll_mod[1]}' would reroll all possible values");
+			if self.reroll_mod[0] in Comparisons:
+				if Comparisons[self.reroll_mod[0]](1, self.reroll_mod[1]) and Comparisons[self.reroll_mod[0]](self.dice_sides, self.reroll_mod[1]):
+					raise DiceError(f"Reroll modifier '{self.reroll_mod[0]}{self.reroll_mod[1]}' would reroll all possible values");
 		elif remove:
 			if RollerUtils.is_digit(remove):
 				self.remove_mod = ("==", int(remove));
@@ -188,11 +194,16 @@ class DiceSet:
 						self.remove_mod = (comp, int(remove.removeprefix(comp)));
 
 						break;
+			elif remove == "low":
+				self.remove_mod = ("low", 0);
+			elif remove == "high":
+				self.remove_mod = ("high", 0);
 			else:
 				raise DiceError(f"Invalid remove modifier '{remove}'");
 
-			if Comparisons[self.remove_mod[0]](1, self.remove_mod[1]) and Comparisons[self.remove_mod[0]](self.dice_sides, self.remove_mod[1]):
-				raise DiceError(f"Remove modifier '{self.remove_mod[0]}{self.remove_mod[1]}' would remove all possible values");
+			if self.remove_mod[0] in Comparisons:
+				if Comparisons[self.remove_mod[0]](1, self.remove_mod[1]) and Comparisons[self.remove_mod[0]](self.dice_sides, self.remove_mod[1]):
+					raise DiceError(f"Remove modifier '{self.remove_mod[0]}{self.remove_mod[1]}' would remove all possible values");
 
 		if self.mul_mod is not None:
 			self.sub_dice = [];
@@ -283,15 +294,33 @@ class DiceSet:
 			self.result.append(self.roll_single());
 
 		if self.reroll_mod:
-			for i in range(len(self.result)):
-				while Comparisons[self.reroll_mod[0]](self.result[i], self.reroll_mod[1]):
-					self.result[i] = self.roll_single();
+			if self.reroll_mod[0] == "low":
+				min_val: int = min(self.result);
+
+				self.result[self.result.index(min_val)] = self.roll_single();
+			elif self.reroll_mod[0] == "high":
+				max_val: int = max(self.result);
+
+				self.result[self.result.index(max_val)] = self.roll_single();
+			else:
+				for i in range(len(self.result)):
+					while Comparisons[self.reroll_mod[0]](self.result[i], self.reroll_mod[1]):
+						self.result[i] = self.roll_single();
 		elif self.remove_mod:
 			to_remove: list[int] = [];
 
-			for i in range(len(self.result)):
-				if Comparisons[self.remove_mod[0]](self.result[i], self.remove_mod[1]):
-					to_remove.append(i);
+			if self.remove_mod[0] == "low":
+				min_val: int = min(self.result);
+
+				to_remove.append(self.result.index(min_val));
+			elif self.remove_mod[0] == "high":
+				max_val: int = max(self.result);
+
+				to_remove.append(self.result.index(max_val));
+			else:
+				for i in range(len(self.result)):
+					if Comparisons[self.remove_mod[0]](self.result[i], self.remove_mod[1]):
+						to_remove.append(i);
 
 			for i in reversed(to_remove):
 				del self.result[i];
@@ -763,6 +792,7 @@ class AppState(dict):
 
 
 def get_help(app_state: AppState, context: str = "") -> str:
+	"""Get general or contextual help"""
 	# Special case, tailor help to discord specific help
 	if app_state["options"].mode == "discord" and context == "":
 		context = "discord";
@@ -776,17 +806,47 @@ def get_help(app_state: AppState, context: str = "") -> str:
 			return HelpStr;
 
 
-def start_timer(app_state: AppState, seconds: str, sound: str = "alarm-clock-1.wav") -> None:
+def start_timer(_: AppState, seconds: str, sound: str = "alarm-clock-1.wav") -> None:
 	SoundTimer(int(seconds), sound);
 
 
-def switch_dicemode(app_state: AppState, mode: str) -> str:
-	if mode in app_state["dicemodes"]:
+def switch_dicemode(app_state: AppState, mode: str = "") -> str:
+	"""Switch or clear active dicemode"""
+	if mode == "":
+		app_state["dicemode"] = "";
+
+		return "Clearing dicemode";
+	elif mode in app_state["dicemodes"]:
 		app_state["dicemode"] = mode;
 
 		return f"Switching to {mode}";
 	else:
 		return f"No dicemode named '{mode}'";
+
+
+def toss_coins(_: AppState, num: str = "1") -> str:
+	"""Toss coin(s) aka 1d2's"""
+	num_coins: int = int(num);
+
+	results: list[tuple[list[int], int]] = DiceSet(num_coins, 2).get_results();
+
+	coin_results: list[str] = ["Heads" if r == 1 else "Tails" for r in results[0][0]];
+
+	return str(coin_results);
+
+
+def count_dice(_: AppState, dice: str) -> str:
+	"""Count the instances of rolls"""
+	dice_set: DiceSet = DiceSet.from_str(dice);
+	results: list[tuple[list[int], int]] = dice_set.get_results();
+	builder: list[str] = [];
+
+	for i in RollerUtils.range_incl(1, dice_set.dice_sides):
+		just_amt: int = len(str(dice_set.dice_sides));
+		roll_count: int = results[0][0].count(i);
+		builder.append(f"#{i:>0{just_amt}} = {roll_count} ({round(roll_count / dice_set.num_dice * 100, 2)}%)");
+
+	return "\n".join(builder);
 
 
 HelpStr: str = f"""
@@ -797,6 +857,7 @@ quit{Tab * 5}quit the program
 timer <sec> [sound]{Tab * 2}start a timer for <sec> seconds and with [sound]
 clear{Tab * 5}clear the output
 coin{Tab * 5}toss a coin
+coin <num>{Tab * 4}toss num coins
 dicemodes{Tab * 4}list available dicemodes
 dicemode <mode>{Tab * 3}switch to <mode> dicemode, all subsequent rolls with be processed through that dicemode
 Dice rolls:
@@ -807,9 +868,11 @@ Dice rolls:
 {Tab}6d12{{1}}{Tab * 4}roll 6d12 and reroll any 1's
 {Tab}6d12{{<6}}{Tab * 3}roll 6d12 and reroll any matching the condition
 {Tab}6d12{{low}}{Tab * 3}roll 6d12 and reroll the lowest roll
+{Tab}6d12{{high}}{Tab * 3}roll 6d12 and reroll the highest roll
 {Tab}3d20[20]{Tab * 3}roll 3d20 and remove any and all 20's
 {Tab}3d20[>=16]{Tab * 3}roll 3d20 and remove any rolls matching the condition
 {Tab}3d20[low]{Tab * 3}roll 3d20 and remove the lowest roll
+{Tab}3d20[high]{Tab * 3}roll 3d20 and remove the highest roll
 Math expressions:
 {Tab}10 + 14{Tab * 3}addition
 {Tab}54 - 19{Tab * 3}subtraction
@@ -842,6 +905,7 @@ Example dicemode:
 DiscordHelpStr: str = f"""
 help <context>{Tab * 3}get help with topic
 coin{Tab * 5}toss a coin
+coin <num>{Tab * 4}toss num coins
 dicemodes{Tab * 4}list available dicemodes
 dicemode <mode>{Tab * 3}switch to <mode> dicemode, all subsequent rolls with be processed through that dicemode
 Dice rolls:
@@ -852,9 +916,11 @@ Dice rolls:
 {Tab}6d12{{1}}{Tab * 4}roll 6d12 and reroll any 1's
 {Tab}6d12{{<6}}{Tab * 3}roll 6d12 and reroll any matching the condition
 {Tab}6d12{{low}}{Tab * 3}roll 6d12 and reroll the lowest roll
+{Tab}6d12{{high}}{Tab * 3}roll 6d12 and reroll the highest roll
 {Tab}3d20[20]{Tab * 3}roll 3d20 and remove any and all 20's
 {Tab}3d20[>=16]{Tab * 3}roll 3d20 and remove any rolls matching the condition
 {Tab}3d20[low]{Tab * 3}roll 3d20 and remove the lowest roll
+{Tab}3d20[high]{Tab * 3}roll 3d20 and remove the highest roll
 Math expressions:
 {Tab}10 + 14{Tab * 3}addition
 {Tab}54 - 19{Tab * 3}subtraction
@@ -871,7 +937,8 @@ Commands: dict[str, Callable] = {
 	"dicemodes": lambda state: ", ".join(state["dicemodes"].keys()),
 	"dicemode": switch_dicemode,
 	"clear": lambda state: os.system("cls") if "win" in platform.system().lower() else os.system("clear"),
-	"coin": lambda state: "Heads(1)" if int(DiceSet(1, 2)) == 1 else "Tails(2)",
+	"coin": toss_coins,
+	"count": count_dice,
 };
 
 
@@ -923,12 +990,15 @@ def process_input(text_in: str, app_state: AppState) -> str:
 			output = cmd_output;
 	elif DiceSet.is_dice(text_in):
 		# Process dice
-		if app_state["dicemode"]:
-			dm_vars: dict[str, any] = app_state["dicemodes"][app_state["dicemode"]].run(text_in, app_state["options"].debug, capture_print=True);
+		try:
+			if app_state["dicemode"]:
+				dm_vars: dict[str, any] = app_state["dicemodes"][app_state["dicemode"]].run(text_in, app_state["options"].debug, capture_print=True);
 
-			output = dm_vars["output"];
-		else:
-			output = str(DiceSet.from_str(text_in));
+				output = dm_vars["output"];
+			else:
+				output = str(DiceSet.from_str(text_in));
+		except DiceError as e:
+			output = str(e);
 	elif Rdp.Rdp.is_math(text_in):
 		# Process math
 		try:
@@ -989,7 +1059,6 @@ def main() -> int:
 			print(output);
 	elif app_state["options"].mode == "auto":
 		prompt: str = app_state["options"].input.strip();
-
 		output: str = process_input(prompt, app_state);
 
 		print(output);
@@ -1013,11 +1082,28 @@ def main() -> int:
 
 		@client.event
 		async def on_message(message: discord.message.Message) -> None:
-			if message.author.id != client.user.id:
-				reply: str = process_input(message.content, app_state);
+			# Skip our own messages
+			if message.author.id == client.user.id:
+				return;
 
-				if reply:
-					await message.channel.send(reply);
+			# Skip messages with mentions other than us
+			if message.mentions and client.user not in message.mentions or len(message.mentions) > 1:
+				return;
+
+			text_in: str = message.content;
+
+			# Remove the text that mentions us
+			for user in message.mentions:
+				text_in = text_in.replace(user.mention, "").strip();
+
+			# Process input
+			reply: str = process_input(text_in, app_state);
+
+			if reply:
+				if app_state["dicemode"] != "":
+					reply = f"{app_state['dicemode']}\n{reply}";
+
+				await message.channel.send(reply);
 
 
 		# Load a .env file to get the secret stuff

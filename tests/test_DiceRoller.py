@@ -107,6 +107,17 @@ class DiceSetTest(unittest.TestCase):
 			self.assertFalse(any([r >= i for r in result[0][0]]), msg=f"Reroll mod of {{{i}}} resulted in roll of >={i}");
 
 
+	def test_reroll_special(self):
+		num_dice: int = 1000;
+
+		for reroll in ["low", "high"]:
+			result: list[tuple[list[int], int]] = DiceSet(num_dice, 20, reroll=reroll).get_results();
+
+			self._common_asserts(result[0], 20);
+
+			self.assertEqual(len(result[0][0]), num_dice, msg=f"Reroll mod resulted in fewer rolls than original, should be {num_dice}, is incorrect value of {len(result[0][0])}");
+
+
 	def test_remove(self):
 		num_dice: int = 1000;
 
@@ -140,6 +151,17 @@ class DiceSetTest(unittest.TestCase):
 			self.assertLessEqual(len(result[0][0]), 1000, msg=f"Remove mod resulted in more rolls than original, should be less than {num_dice}, is incorrect value of {len(result[0][0])}");
 
 			self.assertFalse(any([r >= i for r in result[0][0]]), msg=f"Remove mod of {{{i}}} resulted in roll of >={i}");
+
+
+	def test_remove_special(self):
+		num_dice: int = 1000;
+
+		for remove in ["low", "high"]:
+			result: list[tuple[list[int], int]] = DiceSet(1000, 20, remove=remove).get_results();
+
+			self._common_asserts(result[0], 20);
+
+			self.assertLessEqual(len(result[0][0]), 1000, msg=f"Remove mod resulted in more rolls than original, should be less than {num_dice}, is incorrect value of {len(result[0][0])}");
 
 
 	def test_is_dice(self):
