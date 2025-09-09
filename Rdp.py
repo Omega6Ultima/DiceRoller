@@ -3,7 +3,6 @@ import math;
 import re;
 
 
-# TODO potentially handle comma'd numbers
 class Rdp:
 	# Pattern for detecting math expression parsable by the parser
 	# Not perfect but good enough to help filter
@@ -37,8 +36,8 @@ class Rdp:
 
 	@staticmethod
 	def is_math(text: str) -> bool:
-		# Remove any spaces first to simply regex
-		text = text.replace(" ", "");
+		# Remove any spaces or commas first to simply regex
+		text = text.replace(" ", "").replace(",", "");
 
 		if Rdp.MathPattern.fullmatch(text):
 			return True;
@@ -49,7 +48,7 @@ class Rdp:
 	def eval_exp(self, expression: str) -> float:
 		"""Evaluate passed in expression"""
 		result: float = 0.0;
-		self.exp = expression;
+		self.exp = expression.replace(",", "");
 		self.index = 0;
 
 		self._get_token();

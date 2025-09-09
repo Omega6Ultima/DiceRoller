@@ -102,6 +102,14 @@ class TestRdp(unittest.TestCase):
 		self.assertEqual(self.rdp.eval_exp("[4 + 5] * (6 - 2)"), 36);
 
 
+	def test_commas(self):
+		self.assertEqual(self.rdp.eval_exp("573,000 + 4"), 573_004);
+		self.assertEqual(self.rdp.eval_exp("82,000 - 4"), 81_996);
+		self.assertEqual(self.rdp.eval_exp("3,000 * 4"), 12_000);
+		self.assertEqual(self.rdp.eval_exp("1,800,064 / 4"), 450_016);
+		self.assertEqual(self.rdp.eval_exp("53,286,000 / 6,000"), 8_881);
+
+
 	def test_vars(self):
 		self.rdp.eval_exp("a = 2");
 		self.assertEqual(self.rdp.eval_exp("a * 4"), 8);
