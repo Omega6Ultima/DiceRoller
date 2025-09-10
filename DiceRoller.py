@@ -800,6 +800,15 @@ def eval_fstr(template: str, **kwargs) -> str:
 	return eval(f"f'''{template}'''", kwargs);
 
 
+def exit_main(app_state: AppState) -> str:
+	if app_state["options"].mode == "active":
+		app_state["done"] = True;
+
+		return "Exiting ...";
+
+	return "";
+
+
 def get_help(app_state: AppState, context: str = "") -> str:
 	"""Get general or contextual help"""
 	# Special case, tailor help to discord specific help
@@ -815,8 +824,14 @@ def get_help(app_state: AppState, context: str = "") -> str:
 			return HelpStr;
 
 
-def start_timer(_: AppState, seconds: str, sound: str = "alarm-clock-1.wav") -> None:
-	SoundTimer(int(seconds), sound);
+def start_timer(app_state: AppState, seconds: str = "", sound: str = "alarm-clock-1.wav") -> str:
+	if seconds == "":
+		return "No seconds give for timer";
+
+	if app_state["options"].mode == "active":
+		SoundTimer(int(seconds), sound);
+
+	return "";
 
 
 def switch_dicemode(app_state: AppState, mode: str = "") -> str:
@@ -833,6 +848,13 @@ def switch_dicemode(app_state: AppState, mode: str = "") -> str:
 		return f"No dicemode named '{mode}'";
 
 
+def inspect_dicemode(app_state: AppState, mode: str = ""):
+	if mode in app_state["dicemodes"]:
+		return "\n" + ("\n".join(app_state["dicemodes"][mode].actions));
+
+	print(f"No dicemode named '{mode}'");
+
+
 def toss_coins(_: AppState, num: str = "1") -> str:
 	"""Toss coin(s) aka 1d2's"""
 	num_coins: int = int(num);
@@ -846,6 +868,9 @@ def toss_coins(_: AppState, num: str = "1") -> str:
 
 def count_dice(_: AppState, dice: str) -> str:
 	"""Count the instances of rolls"""
+	if dice == "":
+		return "No dice given to count";
+
 	dice_set: DiceSet = DiceSet.from_str(dice);
 	results: list[tuple[list[int], int]] = dice_set.get_results();
 	builder: list[str] = [];
@@ -870,6 +895,7 @@ Commands:
 {Tab}coin <num>{Tab * 3}toss num coins
 {Tab}dicemodes{Tab * 3}list available dicemodes
 {Tab}dicemode <mode>{Tab * 2}switch to <mode> dicemode, all subsequent rolls with be processed through that dicemode
+{Tab}inspect <mode>{Tab * 2}print the action list for given dicemode
 Dice rolls:
 {Tab}1d4{Tab * 5}roll a 1d4
 {Tab}1d6+1{Tab * 4}roll a 1d6 and add 1
@@ -921,6 +947,7 @@ Commands:
 {Tab}coin <num>{Tab * 3}toss num coins
 {Tab}dicemodes{Tab * 3}list available dicemodes
 {Tab}dicemode <mode>{Tab * 2}switch to <mode> dicemode, all subsequent rolls with be processed through that dicemode
+{Tab}inspect <mode>{Tab * 2}print the action list for given dicemode
 Dice rolls:
 {Tab}1d4{Tab * 5}roll a 1d4
 {Tab}1d6+1{Tab * 4}roll a 1d6 and add 1
@@ -947,10 +974,14 @@ Math expressions:
 coin, 1d6, 12 \\* 2{Tab * 2}multiple commands/dice/math can done at the same time
 """;
 Commands: dict[str, Callable] = {
+	"exit": exit_main,
+	"quit": exit_main,
+	"stop": exit_main,
 	"help": get_help,
 	"timer": start_timer,
 	"dicemodes": lambda state: ", ".join(state["dicemodes"].keys()),
 	"dicemode": switch_dicemode,
+	"inspect": inspect_dicemode,
 	"clear": lambda state: os.system("cls") if "win" in platform.system().lower() else os.system("clear"),
 	"coin": toss_coins,
 	"count": count_dice,
@@ -1005,23 +1036,21 @@ def process_input(text_in: str, app_state: AppState) -> str:
 		else:
 			texts_index += 1;
 
+	# TODO can we move dice rolls and math into threads?
+	#  would improve performance and prevent the discord mode from complaining about heartbeats
+
 	for text in texts:
 		text = text.strip("'");
 
-		if text == "exit" or text == "stop" or text == "quit":
-			if app_state["options"].mode == "active":
-				app_state["done"] = True;
-
-				return "Exiting ...";
-		elif any([text.startswith(key) for key in Commands]):
+		if any([text.lower().startswith(key) for key in Commands]):
 			# Process commands
 			args: list[str] = text.split(" ");
 			cmd_output: None | str;
 
 			if len(args) == 1:
-				cmd_output = Commands[args[0]](app_state);
+				cmd_output = Commands[args[0].lower()](app_state);
 			else:
-				cmd_output = Commands[args[0]](app_state, *args[1:]);
+				cmd_output = Commands[args[0].lower()](app_state, *args[1:]);
 
 			if cmd_output is not None:
 				output.append(f"{text} => {cmd_output}");
