@@ -496,11 +496,14 @@ class Dicemode:
 		arg_str: str = text.removeprefix(action).removesuffix(")");
 		arg_list: list[str] = [a.strip() for a in arg_str.split(",")];
 
+		# Rejoin any split text within parenthesis
 		arg_index: int = 0;
 
 		while arg_index < len(arg_list):
 			if "(" in arg_list[arg_index] and not ")" in arg_list[arg_index]:
 				arg_list[arg_index] += f", {arg_list[arg_index + 1]}";
+
+				del arg_list[arg_index + 1];
 			else:
 				arg_index += 1;
 
@@ -791,6 +794,10 @@ class AppState(dict):
 		super().__init__();
 
 
+def eval_fstr(template: str, **kwargs) -> str:
+	return eval(f"f'''{template}'''", kwargs);
+
+
 def get_help(app_state: AppState, context: str = "") -> str:
 	"""Get general or contextual help"""
 	# Special case, tailor help to discord specific help
@@ -850,16 +857,17 @@ def count_dice(_: AppState, dice: str) -> str:
 
 
 HelpStr: str = f"""
-help <context>{Tab * 3}get help with topic
-exit{Tab * 5}exit the program
-stop{Tab * 5}stop the program
-quit{Tab * 5}quit the program
-timer <sec> [sound]{Tab * 2}start a timer for <sec> seconds and with [sound]
-clear{Tab * 5}clear the output
-coin{Tab * 5}toss a coin
-coin <num>{Tab * 4}toss num coins
-dicemodes{Tab * 4}list available dicemodes
-dicemode <mode>{Tab * 3}switch to <mode> dicemode, all subsequent rolls with be processed through that dicemode
+Commands:
+{Tab}help <context>{Tab * 2}get help with topic
+{Tab}exit{Tab * 4}exit the program
+{Tab}stop{Tab * 4}stop the program
+{Tab}quit{Tab * 4}quit the program
+{Tab}timer <sec> [sound]{Tab * 1}start a timer for <sec> seconds and with [sound]
+{Tab}clear{Tab * 4}clear the output
+{Tab}coin{Tab * 4}toss a coin
+{Tab}coin <num>{Tab * 3}toss num coins
+{Tab}dicemodes{Tab * 3}list available dicemodes
+{Tab}dicemode <mode>{Tab * 2}switch to <mode> dicemode, all subsequent rolls with be processed through that dicemode
 Dice rolls:
 {Tab}1d4{Tab * 5}roll a 1d4
 {Tab}1d6+1{Tab * 4}roll a 1d6 and add 1
@@ -874,14 +882,16 @@ Dice rolls:
 {Tab}3d20[low]{Tab * 3}roll 3d20 and remove the lowest roll
 {Tab}3d20[high]{Tab * 3}roll 3d20 and remove the highest roll
 Math expressions:
-{Tab}10 + 14{Tab * 3}addition
-{Tab}54 - 19{Tab * 3}subtraction
+{Tab}10 + 14{Tab * 4}addition
+{Tab}54 - 19{Tab * 4}subtraction
 {Tab}4 * 8{Tab * 4}multiplication
-{Tab}27 / 9{Tab * 3}division
-{Tab}50 % 4{Tab * 3}modulo (division remainder)
-{Tab}2 ^ 3{Tab * 3}exponents
-{Tab}3 * ( 2 + 7 ){Tab}parenthesis
+{Tab}27 / 9{Tab * 4}division
+{Tab}50 % 4{Tab * 4}modulo (division remainder)
+{Tab}2 ^ 3{Tab * 4}exponents
+{Tab}3 * ( 2 + 7 ){Tab * 2}parenthesis
+{Tab}'1,000 * 5,000'{Tab * 2}using numbers with commas needs the expression quoted 
 {Tab}
+coin, 1d6, 12 * 2{Tab * 2}multiple commands/dice/math can done at the same time
 """;
 DicemodeHelpStr: str = f"""
 dicemode actions:
@@ -903,11 +913,12 @@ Example dicemode:
 {DefaultDicemodes['10_again']}
 """;
 DiscordHelpStr: str = f"""
-help <context>{Tab * 3}get help with topic
-coin{Tab * 5}toss a coin
-coin <num>{Tab * 4}toss num coins
-dicemodes{Tab * 4}list available dicemodes
-dicemode <mode>{Tab * 3}switch to <mode> dicemode, all subsequent rolls with be processed through that dicemode
+Commands:
+{Tab}help <context>{Tab * 2}get help with topic
+{Tab}coin{Tab * 4}toss a coin
+{Tab}coin <num>{Tab * 3}toss num coins
+{Tab}dicemodes{Tab * 3}list available dicemodes
+{Tab}dicemode <mode>{Tab * 2}switch to <mode> dicemode, all subsequent rolls with be processed through that dicemode
 Dice rolls:
 {Tab}1d4{Tab * 5}roll a 1d4
 {Tab}1d6+1{Tab * 4}roll a 1d6 and add 1
@@ -922,14 +933,16 @@ Dice rolls:
 {Tab}3d20[low]{Tab * 3}roll 3d20 and remove the lowest roll
 {Tab}3d20[high]{Tab * 3}roll 3d20 and remove the highest roll
 Math expressions:
-{Tab}10 + 14{Tab * 3}addition
-{Tab}54 - 19{Tab * 3}subtraction
+{Tab}10 + 14{Tab * 4}addition
+{Tab}54 - 19{Tab * 4}subtraction
 {Tab}4 \\* 8{Tab * 4}multiplication
-{Tab}27 / 9{Tab * 3}division
-{Tab}50 % 4{Tab * 3}modulo (division remainder)
-{Tab}2 ^ 3{Tab * 3}exponents
-{Tab}3 \\* ( 2 + 7 ){Tab}parenthesis
+{Tab}27 / 9{Tab * 4}division
+{Tab}50 % 4{Tab * 4}modulo (division remainder)
+{Tab}2 ^ 3{Tab * 4}exponents
+{Tab}3 \\* ( 2 + 7 ){Tab * 2}parenthesis
+{Tab}'1,000 \\* 5,000'{Tab * 2}using numbers with commas needs the expression quoted 
 {Tab}
+coin, 1d6, 12 \\* 2{Tab * 2}multiple commands/dice/math can done at the same time
 """;
 Commands: dict[str, Callable] = {
 	"help": get_help,
@@ -970,45 +983,70 @@ def load_dicemodes(filename: str, dicemodes: dict[str, Dicemode]) -> None:
 
 
 def process_input(text_in: str, app_state: AppState) -> str:
-	output: str = "";
+	texts: list[str];
+	output: list[str] = [];
 
-	if text_in == "exit" or text_in == "stop" or text_in == "quit":
-		app_state["done"] = True;
-
-		output = "Exiting ...";
-	elif any([text_in.startswith(key) for key in Commands]):
-		# Process commands
-		args: list[str] = text_in.split(" ");
-		cmd_output: None | str;
-
-		if len(args) == 1:
-			cmd_output = Commands[args[0]](app_state);
-		else:
-			cmd_output = Commands[args[0]](app_state, *args[1:]);
-
-		if cmd_output is not None:
-			output = cmd_output;
-	elif DiceSet.is_dice(text_in):
-		# Process dice
-		try:
-			if app_state["dicemode"]:
-				dm_vars: dict[str, any] = app_state["dicemodes"][app_state["dicemode"]].run(text_in, app_state["options"].debug, capture_print=True);
-
-				output = dm_vars["output"];
-			else:
-				output = str(DiceSet.from_str(text_in));
-		except DiceError as e:
-			output = str(e);
-	elif Rdp.Rdp.is_math(text_in):
-		# Process math
-		try:
-			output = str(app_state["rdp"].eval_exp(text_in));
-		except (SyntaxError, ZeroDivisionError, OverflowError) as e:
-			output = str(e);
+	# Split any comma separated commands, dice, or math
+	if "," in text_in:
+		texts = [t.strip() for t in text_in.split(",")];
 	else:
-		output = f"Entered text '{text_in}' is not a command, dice, or math expression";
+		texts = [text_in, ];
 
-	return output;
+	# Rejoin any split text that was quoted
+	texts_index: int = 0;
+
+	while texts_index < len(texts):
+		if texts[texts_index].count("'") == 1:
+			texts[texts_index] += f",{texts[texts_index + 1]}";
+
+			del texts[texts_index + 1];
+		else:
+			texts_index += 1;
+
+	for text in texts:
+		text = text.strip("'");
+
+		if text == "exit" or text == "stop" or text == "quit":
+			if app_state["options"].mode == "active":
+				app_state["done"] = True;
+
+				return "Exiting ...";
+		elif any([text.startswith(key) for key in Commands]):
+			# Process commands
+			args: list[str] = text.split(" ");
+			cmd_output: None | str;
+
+			if len(args) == 1:
+				cmd_output = Commands[args[0]](app_state);
+			else:
+				cmd_output = Commands[args[0]](app_state, *args[1:]);
+
+			if cmd_output is not None:
+				output.append(f"{text} => {cmd_output}");
+		elif DiceSet.is_dice(text):
+			# Process dice
+			try:
+				if app_state["dicemode"]:
+					dicemode: Dicemode = app_state["dicemodes"][app_state["dicemode"]];
+
+					dm_vars: dict[str, any] = dicemode.run(text, app_state["options"].debug, capture_print=True);
+
+					output.append(f"{text} => {dm_vars["output"]}");
+				else:
+					output.append(f"{text} => {str(DiceSet.from_str(text))}");
+			except DiceError as e:
+				output.append(f"{text} => {str(e)}");
+		# Math text is the only kind that might need quoted
+		elif Rdp.Rdp.is_math(text):
+			# Process math
+			try:
+				output.append(f"{text} => {str(app_state["rdp"].eval_exp(text))}");
+			except (SyntaxError, ZeroDivisionError, OverflowError) as e:
+				output.append(f"{text} => {str(e)}");
+		else:
+			output.append(f"Entered text '{text}' is not a command, dice, or math expression");
+
+	return "\n".join(output);
 
 
 def main() -> int:
@@ -1086,18 +1124,19 @@ def main() -> int:
 			if message.author.id == client.user.id:
 				return;
 
-			# Skip messages with mentions other than us
-			if message.mentions and client.user not in message.mentions or len(message.mentions) > 1:
-				return;
+			# Skip messages with mentions of users other than us
+			if message.mentions:
+				if any([user.id != client.user.id for user in message.mentions]):
+					return;
 
-			text_in: str = message.content;
+			content: str = message.content;
 
 			# Remove the text that mentions us
 			for user in message.mentions:
-				text_in = text_in.replace(user.mention, "").strip();
+				content = content.replace(user.mention, "").strip();
 
 			# Process input
-			reply: str = process_input(text_in, app_state);
+			reply: str = process_input(content, app_state);
 
 			if reply:
 				if app_state["dicemode"] != "":
