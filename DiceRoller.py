@@ -1,57 +1,25 @@
 import argparse;
-import dotenv;
-import io;
 import logging;
 import os;
 import platform;
-import random;
-import re;
 import sys;
 import threading;
 import unittest;
-
-# Used for type hints
-from io import StringIO;
-from typing import Callable, TextIO;
+from typing import Callable;
 
 import discord;
+import dotenv;
 import playsound3;
 
-import Rdp;
 import RollerUtils;
+from DiceMode import DiceMode;
+from DiceSet import DiceError, DiceSet;
+from Rdp import Rdp;
 
 # Tab character for use in f-strings
 Tab: str = "\t";
 # Newline character for use in f-strings
 NL: str = "\n";
-# Comparison signs and their related functions
-Comparisons: dict[str, Callable] = {
-	"<=": lambda a, b: a <= b,
-	">=": lambda a, b: a >= b,
-	"<": lambda a, b: a < b,
-	">": lambda a, b: a > b,
-	"==": lambda a, b: a == b,
-	"!=": lambda a, b: a != b,
-
-	"lte": lambda a, b: a <= b,
-	"gte": lambda a, b: a >= b,
-	"lt": lambda a, b: a < b,
-	"gt": lambda a, b: a > b,
-	"eq": lambda a, b: a == b,
-	"neq": lambda a, b: a != b,
-};
-# Calculation signs and their related functions
-Calculations: dict[str, Callable] = {
-	"+": lambda a, b: a + b,
-	"-": lambda a, b: a - b,
-	"*": lambda a, b: a * b,
-	"/": lambda a, b: a / b,
-
-	"add": lambda a, b: a + b,
-	"sub": lambda a, b: a - b,
-	"mul": lambda a, b: a * b,
-	"div": lambda a, b: a / b,
-};
 # The default dicemode filename
 DefaultDicemodeFile: str = "dicemodes.txt";
 # The pre-defined dicemodes, will be written to file if it doesn't exist
@@ -114,16 +82,6 @@ dicemode(Hero_kill):
 };
 
 
-class DiceError(Exception):
-	def __init__(self, text: str):
-		Exception.__init__(self, text);
-		self.msg = text;
-
-
-	def __str__(self) -> str:
-		return f"DiceError {self.msg}";
-
-
 class SoundTimer:
 	def __init__(self, time_sec: int, sound: str):
 		self.sound = sound;
@@ -133,662 +91,6 @@ class SoundTimer:
 
 	def run(self):
 		playsound3.playsound(self.sound);
-
-
-class DiceSet:
-	ValidComparisons: list[str] = ["<=", ">=", "<", ">"];
-	DicePattern: re.Pattern = re.compile(r"""(\d+\*)?            		# optional multiplier
-											\d+(?:\.\d+)?               		# number of dice
-											[dD]
-											\d+                         		# number of sides
-											([+-]\d+)?                  		# optional add/sub
-											(?:									# one of (or none)
-											(\{(?:[<>=]*\d+ | low | high)})? |	# optional reroll modifier
-											(\[(?:[<>=]*\d+ | low | high)])?	# optional remove modifier
-											)?""", re.X);
-
-	def __init__(self, num_dice: float, dice_sides: int, mul: None | int = None, add: None | int = None, reroll: None | str = None, remove: None | str = None):
-		self.num_dice: float = num_dice;
-		self.dice_sides: int = dice_sides;
-
-		self.mul_mod: None | int = mul;
-		self.add_mod: int = add if add else 0;
-		self.reroll_mod: None | tuple[str, int] = None;
-		self.remove_mod: None | tuple[str, int] = None;
-
-		self.result: None | list[int] = None;
-		self.sub_dice: None | list[DiceSet] = None;
-		self._display: None | str = None;
-
-		# Validity checks
-		if self.mul_mod is not None and self.mul_mod <= 0:
-			raise DiceError("Mul mod cannot be 0 or negative");
-
-		if reroll and remove:
-			raise DiceError("Cannot specify reroll and remove modifiers together");
-
-		# Process passed modifiers
-		if reroll:
-			if RollerUtils.is_digit(reroll):
-				self.reroll_mod = ("==", int(reroll));
-			elif any([comp in reroll for comp in self.ValidComparisons]):
-				for comp in self.ValidComparisons:
-					if comp in reroll:
-						self.reroll_mod = (comp, int(reroll.removeprefix(comp)));
-
-						break;
-			elif reroll == "low":
-				self.reroll_mod = ("low", 0);
-			elif reroll == "high":
-				self.reroll_mod = ("high", 0);
-			else:
-				raise DiceError(f"Invalid reroll modifier '{reroll}'");
-
-			if self.reroll_mod[0] in Comparisons:
-				if Comparisons[self.reroll_mod[0]](1, self.reroll_mod[1]) and Comparisons[self.reroll_mod[0]](self.dice_sides, self.reroll_mod[1]):
-					raise DiceError(f"Reroll modifier '{self.reroll_mod[0]}{self.reroll_mod[1]}' would reroll all possible values");
-		elif remove:
-			if RollerUtils.is_digit(remove):
-				self.remove_mod = ("==", int(remove));
-			elif any([comp in remove for comp in self.ValidComparisons]):
-				for comp in self.ValidComparisons:
-					if comp in remove:
-						self.remove_mod = (comp, int(remove.removeprefix(comp)));
-
-						break;
-			elif remove == "low":
-				self.remove_mod = ("low", 0);
-			elif remove == "high":
-				self.remove_mod = ("high", 0);
-			else:
-				raise DiceError(f"Invalid remove modifier '{remove}'");
-
-			if self.remove_mod[0] in Comparisons:
-				if Comparisons[self.remove_mod[0]](1, self.remove_mod[1]) and Comparisons[self.remove_mod[0]](self.dice_sides, self.remove_mod[1]):
-					raise DiceError(f"Remove modifier '{self.remove_mod[0]}{self.remove_mod[1]}' would remove all possible values");
-
-		if self.mul_mod is not None:
-			self.sub_dice = [];
-
-			for _ in range(self.mul_mod - 1):
-				dice: DiceSet = DiceSet(self.num_dice, self.dice_sides, add=self.add_mod);
-				dice.reroll_mod = self.reroll_mod;
-				dice.remove_mod = self.remove_mod;
-
-				self.sub_dice.append(dice);
-
-
-	def roll_single(self) -> int:
-		"""Roll a single die and return the result"""
-		return random.randint(1, self.dice_sides);
-
-
-	@classmethod
-	def from_str(cls, text: str) -> "DiceSet":
-		"""Parse the passed string and return a DiceSet constructed from the string"""
-		text = text.lower();
-
-		if DiceSet.is_dice(text):
-			num_dice: str = text[:text.find("d")];
-			dice_side: str = text[text.find("d") + 1:];
-
-			mods: dict[str, any] = {};
-
-			# Peel off modifiers starting from the front or back and work inwards
-			if "*" in num_dice:
-				mul, num_dice = num_dice.split("*");
-
-				mods["mul"] = int(mul);
-
-			if "{" in dice_side:
-				dice_side, reroll = dice_side.split("{");
-
-				mods["reroll"] = reroll.strip("{}");
-			elif "[" in dice_side:
-				dice_side, remove = dice_side.split("[");
-
-				mods["remove"] = remove.strip("[]");
-
-			if "+" in dice_side:
-				dice_side, add = dice_side.split("+");
-
-				mods["add"] = int(add);
-			elif "-" in dice_side:
-				dice_side, sub = dice_side.split("-");
-
-				mods["add"] = int(sub);
-
-			try:
-				return DiceSet(float(num_dice), int(dice_side), **mods);
-			except ValueError as e:
-				print(e);
-
-		raise DiceError(f"Invalid dice format {text}");
-
-
-	@staticmethod
-	def is_dice(text: str) -> bool:
-		# Remove any spaces first to simply regex
-		text = text.replace(" ", "");
-
-
-		if DiceSet.DicePattern.fullmatch(text):
-			return True;
-
-		return False;
-
-
-	def verify_dice(self, die_sides: int) -> bool:
-		"""Return True if the diceset uses the number of sides passed in"""
-		return self.dice_sides == die_sides;
-
-
-	def process(self) -> None:
-		"""Process the DiceSet and roll the dice represented by the DiceSet"""
-		self._display = None;
-
-		if self.result is None:
-			self.result = [];
-		else:
-			self.result.clear();
-
-		for _ in range(int(self.num_dice)):
-			self.result.append(self.roll_single());
-
-		if self.reroll_mod:
-			if self.reroll_mod[0] == "low":
-				min_val: int = min(self.result);
-
-				self.result[self.result.index(min_val)] = self.roll_single();
-			elif self.reroll_mod[0] == "high":
-				max_val: int = max(self.result);
-
-				self.result[self.result.index(max_val)] = self.roll_single();
-			else:
-				for i in range(len(self.result)):
-					while Comparisons[self.reroll_mod[0]](self.result[i], self.reroll_mod[1]):
-						self.result[i] = self.roll_single();
-		elif self.remove_mod:
-			to_remove: list[int] = [];
-
-			if self.remove_mod[0] == "low":
-				min_val: int = min(self.result);
-
-				to_remove.append(self.result.index(min_val));
-			elif self.remove_mod[0] == "high":
-				max_val: int = max(self.result);
-
-				to_remove.append(self.result.index(max_val));
-			else:
-				for i in range(len(self.result)):
-					if Comparisons[self.remove_mod[0]](self.result[i], self.remove_mod[1]):
-						to_remove.append(i);
-
-			for i in reversed(to_remove):
-				del self.result[i];
-
-		if self.sub_dice:
-			for dice in self.sub_dice:
-				dice.process();
-
-
-	def display(self) -> str:
-		"""Return a string representing the DiceSet"""
-		if self._display is None:
-			builder: list[str] = [];
-
-			if self.mul_mod:
-				builder.append(f"{self.mul_mod}*");
-
-			builder.append(f"{self.num_dice}d{self.dice_sides}");
-
-			if self.add_mod:
-				if self.add_mod > 0:
-					builder.append(f"+{self.add_mod}");
-				else:
-					builder.append(f"-{self.add_mod}");
-
-			if self.reroll_mod:
-				builder.append(f"{{{self.reroll_mod[0]}{self.reroll_mod[1]}}}");
-
-			if self.remove_mod:
-				builder.append(f"[{self.remove_mod[0]}{self.remove_mod[1]}]");
-
-			self._display = "".join(builder);
-
-		return self._display;
-
-
-	def get_results(self) -> list[tuple[list[int], int]]:
-		"""Returns the results of rolling the DiceSet"""
-		results: list[tuple[list[int], int]] = [];
-
-		if self.result is None:
-			self.process();
-
-		results.append((self.result, self.add_mod));
-
-		if self.sub_dice:
-			for dice in self.sub_dice:
-				results.append((dice.result, dice.add_mod));
-
-		return results;
-
-
-	def __str__(self) -> str:
-		builder: list[str] = [];
-
-		if self.result is None:
-			self.process();
-
-		builder.append(f"{self.result}");
-
-		if self.add_mod:
-			if self.add_mod > 0:
-				builder.append(f" + {self.add_mod}");
-			else:
-				builder.append(f" - {self.add_mod}");
-
-		if self.sub_dice:
-			for dice in self.sub_dice:
-				dice_str: str = str(dice);
-
-				# Remove subdice total and equal sign
-				builder.append(f", {dice_str[:dice_str.find("=") - 1]}");
-
-		builder.append(f" = {int(self)}");
-
-		return "".join(builder);
-
-
-	def __int__(self) -> int:
-		total: int = 0;
-
-		if self.result is None:
-			self.process();
-
-		total += sum(self.result) + self.add_mod;
-
-		if self.sub_dice:
-			for dice in self.sub_dice:
-				total += sum(dice.result) + dice.add_mod;
-
-		return total;
-
-
-	def __eq__(self, other: "DiceSet") -> bool:
-		if not isinstance(other, DiceSet):
-			raise TypeError(f"Trying to compare DiceSet to {type(other)}");
-
-		if self.num_dice != other.num_dice:
-			return False;
-
-		if self.dice_sides != other.dice_sides:
-			return False;
-
-		if self.add_mod != other.add_mod:
-			return False;
-
-		if self.mul_mod != other.mul_mod:
-			return False;
-
-		if self.reroll_mod != other.reroll_mod:
-			return False;
-
-		if self.remove_mod != other.remove_mod:
-			return False;
-
-		return True;
-
-
-class Dicemode:
-	def __init__(self, name: str, actions: list[str]):
-		self.name: str = name;
-		self.actions: list[str] = actions.copy();
-		self.action_index: int = 0;
-		self.done: bool = False;
-		self.loop_entry: None | int = None;
-		self.loop_end: None | int = None;
-		self.output: TextIO | StringIO = sys.stdout;
-
-
-	def run(self, dice: str, debug: bool = False, capture_print: bool = False) -> dict[str, any]:
-		self.done = False;
-		self.loop_entry = None;
-		self.loop_end = None;
-		self.action_index = 0;
-
-		if capture_print:
-			self.output = io.StringIO();
-
-		diceset: DiceSet = DiceSet.from_str(dice);
-
-		mode_vars: dict[str, any] = {
-			"True": True,
-			"False": False,
-			"rolls": [],
-			"rolls_adj": 0,
-		};
-
-		while not self.done:
-			self._execute_action(self.actions[self.action_index], diceset, mode_vars, debug);
-
-			self.action_index += 1;
-
-			if self.action_index >= len(self.actions):
-				if self.loop_entry is not None:
-					self.action_index = self.loop_entry;
-				else:
-					self.done = True;
-
-		if debug:
-			print(mode_vars);
-
-		if capture_print:
-			mode_vars["output"] = self.output.getvalue();
-
-			self.output = sys.stdout;
-
-		return mode_vars;
-
-
-	@staticmethod
-	def _collect_args(text: str) -> list[str]:
-		action: str = text[:text.find("(") + 1];
-		arg_str: str = text.removeprefix(action).removesuffix(")");
-		arg_list: list[str] = [a.strip() for a in arg_str.split(",")];
-
-		# Rejoin any split text within parenthesis
-		arg_index: int = 0;
-
-		while arg_index < len(arg_list):
-			if "(" in arg_list[arg_index] and not ")" in arg_list[arg_index]:
-				arg_list[arg_index] += f", {arg_list[arg_index + 1]}";
-
-				del arg_list[arg_index + 1];
-			else:
-				arg_index += 1;
-
-		return arg_list;
-
-
-	def _execute_action(self, action: str, diceset: DiceSet, mode_vars: dict[str, any], debug: bool = False) -> None:
-		if self.loop_entry is not None:
-			if self.action_index > self.loop_end:
-				self.action_index = self.loop_entry;
-
-				action = self.actions[self.action_index];
-
-		clean_action: str = action.lstrip();
-
-		if debug:
-			print(f"Executing action #{self.action_index} '{clean_action}'", file=self.output);
-
-		if clean_action.startswith("store("):
-			args: list[str] = self._collect_args(clean_action);
-
-			val: float = float(args[0]);
-			var: str = args[1];
-
-			if debug:
-				print(f"  Storing {val} into '{var}'", file=self.output);
-
-			mode_vars[var] = val;
-		elif clean_action.startswith("check("):
-			args: list[str] = self._collect_args(clean_action);
-
-			die_sides: int = int(args[0].removeprefix("d"));
-
-			if debug:
-				print(f"  Checking dice are d{die_sides}'s", file=self.output);
-
-			if not diceset.verify_dice(die_sides):
-				self.done = True;
-
-				print(f"Using dicemode {self.name} with non-d{die_sides}, dice passed are d{diceset.dice_sides}", file=self.output);
-		elif clean_action.startswith("roll("):
-			args: list[str] = self._collect_args(clean_action);
-			result: list[tuple[list[int], int]] = [];
-
-			dice: str = args[0];
-
-			try:
-				if dice == "dice":
-					if debug:
-						print(f"  Rolling {diceset.display()}", file=self.output);
-
-					result.extend(diceset.get_results());
-				else:
-					if debug:
-						print(f"  Rolling {dice}", file=self.output);
-
-					result.extend(DiceSet.from_str(dice).get_results());
-			except DiceError as e:
-				print(e, file=self.output);
-
-				self.done = True;
-
-				return;
-
-			for i in range(len(result)):
-				mode_vars["rolls"].extend(result[i][0]);
-				mode_vars["rolls_adj"] += result[i][1];
-		elif clean_action.startswith("rollinto("):
-			args: list[str] = self._collect_args(clean_action);
-			result: int = 0;
-
-			dice: str = args[0];
-			var: str = args[1];
-
-			try:
-				if debug:
-					print(f"  Rolling {dice} and storing into '{var}'", file=self.output);
-
-				result += int(DiceSet.from_str(dice));
-			except DiceError as e:
-				print(e, file=self.output);
-
-				self.done = True;
-
-				return;
-
-			mode_vars[var] = result;
-		elif clean_action.startswith("total("):
-			args: list[str] = self._collect_args(clean_action);
-
-			var: str = args[0];
-
-			if debug:
-				print(f"  Totaling dice rolls and storing into '{var}'", file=self.output);
-
-			mode_vars[var] = sum(mode_vars["rolls"]) + mode_vars["rolls_adj"];
-		elif clean_action.startswith("count("):
-			args: list[str] = self._collect_args(clean_action);
-
-			comp: str = args[0];
-			val: float = float(args[1]);
-			var: str = args[2];
-
-			if comp not in Comparisons:
-				print(f"'{comp}' is not a valid comparison", file=self.output);
-
-				self.done = True;
-
-				return;
-
-			if debug:
-				print(f"  Counting rolls that match {comp} {val} and storing into '{var}'", file=self.output);
-
-			count: int = 0;
-
-			for roll in mode_vars["rolls"]:
-				if Comparisons[comp](roll, val):
-					count += 1;
-
-			if debug:
-				print(f"  Matching rolls: {count}, Non-matching rolls: {len(mode_vars["rolls"]) - count}", file=self.output);
-
-			mode_vars[var] = count;
-		elif clean_action.startswith("calc("):
-			args: list[str] = self._collect_args(clean_action);
-
-			var1: str = args[0];
-			op: str = args[1];
-			var2: str = args[2];
-
-			if var1 not in mode_vars:
-				print(f"'{var1}' has not been set before use", file=self.output);
-
-				self.done = True;
-
-				return;
-
-			if op not in Calculations:
-				print(f"'{op}' is not a valid calculation", file=self.output);
-
-				self.done = True;
-
-				return;
-
-			if var2 not in mode_vars:
-				print(f"'{var2}' has not been set before use", file=self.output);
-
-				self.done = True;
-
-				return;
-
-			if debug:
-				print(f"  Calculating '{var1} {op} {var2}' and storing into '{var1}'", file=self.output);
-				print(f"  {mode_vars[var1]} {op} {mode_vars[var2]} = {Calculations[op](mode_vars[var1], mode_vars[var2])}", file=self.output);
-
-			mode_vars[var1] = Calculations[op](mode_vars[var1], mode_vars[var2]);
-		elif clean_action.startswith("if("):
-			args: list[str] = self._collect_args(clean_action);
-
-			var1: str = args[0];
-			comp: str = args[1];
-			var2: str = args[2];
-			sub_action = args[3];
-
-			if var1 not in mode_vars:
-				print(f"'{var1}' has not been set before use", file=self.output);
-
-				self.done = True;
-
-				return;
-
-			if comp not in Comparisons:
-				print(f"'{comp}' is not a valid calculation", file=self.output);
-
-				self.done = True;
-
-				return;
-
-			if var2 not in mode_vars:
-				print(f"'{var2}' has not been set before use", file=self.output);
-
-				self.done = True;
-
-				return;
-
-			if debug:
-				print(f"  If '{var1} {comp} {var2}' is True, then execute '{sub_action}'", file=self.output);
-				print(f"  {mode_vars[var1]} {comp} {mode_vars[var2]} = {Comparisons[comp](mode_vars[var1], mode_vars[var2])}", file=self.output);
-
-			if Comparisons[comp](mode_vars[var1], mode_vars[var2]):
-				self._execute_action(sub_action, diceset, mode_vars, debug);
-		elif clean_action.startswith("foreach("):
-			args: list[str] = self._collect_args(clean_action);
-
-			var: str = args[0];
-			sub_action: str = args[1];
-
-			if var not in mode_vars:
-				print(f"'{var}' has not been set before use", file=self.output);
-
-				self.done = True;
-
-				return;
-
-			if debug:
-				print(f"  Looping {int(mode_vars[var])} times and running '{sub_action}'", file=self.output);
-
-			for _ in range(int(mode_vars[var])):
-				self._execute_action(sub_action, diceset, mode_vars, debug);
-		elif clean_action.startswith("while("):
-			args: list[str] = self._collect_args(clean_action);
-
-			var1: str = args[0];
-			comp: str = args[1];
-			var2: str = args[2];
-
-			if var1 not in mode_vars:
-				print(f"'{var1}' has not been set before use", file=self.output);
-
-				self.done = True;
-
-				return;
-
-			if comp not in Comparisons:
-				print(f"'{comp}' is not a valid calculation", file=self.output);
-
-				self.done = True;
-
-				return;
-
-			if var2 not in mode_vars:
-				print(f"'{var2}' has not been set before use", file=self.output);
-
-				self.done = True;
-
-				return;
-
-			# Calculate loop_end
-			if self.loop_end is None:
-				loop_end: int = self.action_index + 1;
-				indent_level: str = self.actions[loop_end].count("\t") * "\t";
-
-				while self.actions[loop_end].startswith(indent_level):
-					loop_end += 1;
-
-				self.loop_end = loop_end - 1;
-
-			if debug:
-				print(f"  Looping while '{var1} {comp} {var2}' from action #{self.action_index} to #{self.loop_end}", file=self.output);
-				print(f"  {mode_vars[var1]} {comp} {mode_vars[var2]} = {Comparisons[comp](mode_vars[var1], mode_vars[var2])}", file=self.output);
-
-			if Comparisons[comp](mode_vars[var1], mode_vars[var2]):
-				self.loop_entry = self.action_index;
-			else:
-				self.action_index = self.loop_end;
-				self.loop_entry = None;
-				self.loop_end = None;
-		elif clean_action.startswith("break"):
-			if self.loop_entry is None:
-				print("Break action outside of loop", file=self.output);
-
-			if debug:
-				print(f"  Breaking out from loop({self.loop_entry}-{self.loop_end})", file=self.output);
-
-			self.action_index = self.loop_end;
-			self.loop_entry = None;
-			self.loop_end = None;
-		elif clean_action.startswith("print("):
-			args: list[str] = self._collect_args(clean_action);
-
-			var: str = args[0];
-
-			if var not in mode_vars:
-				print(f"'{var}' has not been set before use", file=self.output);
-
-				self.done = True;
-
-				return;
-
-			if debug:
-				print(f"  Printing value of '{var}'", file=self.output);
-
-			print(f"{var} = {mode_vars[var]}", file=self.output);
 
 
 class AppState(dict):
@@ -988,7 +290,7 @@ Commands: dict[str, Callable] = {
 };
 
 
-def load_dicemodes(filename: str, dicemodes: dict[str, Dicemode]) -> None:
+def load_dicemodes(filename: str, dicemodes: dict[str, DiceMode]) -> None:
 	with open(filename, "r") as mode_file:
 		parsing_mode: str = "";
 		mode_actions: list[str] = [];
@@ -999,12 +301,12 @@ def load_dicemodes(filename: str, dicemodes: dict[str, Dicemode]) -> None:
 
 			if line.startswith("dicemode("):
 				if parsing_mode:
-					dicemodes[parsing_mode] = Dicemode(parsing_mode, mode_actions);
+					dicemodes[parsing_mode] = DiceMode(parsing_mode, mode_actions);
 					mode_actions.clear();
 
 				parsing_mode = line.removeprefix("dicemode").strip("():");
 			elif line.strip() == "":
-				dicemodes[parsing_mode] = Dicemode(parsing_mode, mode_actions);
+				dicemodes[parsing_mode] = DiceMode(parsing_mode, mode_actions);
 				parsing_mode = "";
 				mode_actions.clear();
 			else:
@@ -1012,7 +314,7 @@ def load_dicemodes(filename: str, dicemodes: dict[str, Dicemode]) -> None:
 				mode_actions.append(line.replace("    ", "\t").removeprefix("\t"));
 
 		if parsing_mode:
-			dicemodes[parsing_mode] = Dicemode(parsing_mode, mode_actions);
+			dicemodes[parsing_mode] = DiceMode(parsing_mode, mode_actions);
 
 
 def process_input(text_in: str, app_state: AppState) -> str:
@@ -1036,9 +338,6 @@ def process_input(text_in: str, app_state: AppState) -> str:
 		else:
 			texts_index += 1;
 
-	# TODO can we move dice rolls and math into threads?
-	#  would improve performance and prevent the discord mode from complaining about heartbeats
-
 	for text in texts:
 		text = text.strip("'");
 
@@ -1058,7 +357,7 @@ def process_input(text_in: str, app_state: AppState) -> str:
 			# Process dice
 			try:
 				if app_state["dicemode"]:
-					dicemode: Dicemode = app_state["dicemodes"][app_state["dicemode"]];
+					dicemode: DiceMode = app_state["dicemodes"][app_state["dicemode"]];
 
 					dm_vars: dict[str, any] = dicemode.run(text, app_state["options"].debug, capture_print=True);
 
@@ -1068,7 +367,7 @@ def process_input(text_in: str, app_state: AppState) -> str:
 			except DiceError as e:
 				output.append(f"{text} => {str(e)}");
 		# Math text is the only kind that might need quoted
-		elif Rdp.Rdp.is_math(text):
+		elif Rdp.is_math(text):
 			# Process math
 			try:
 				output.append(f"{text} => {str(app_state["rdp"].eval_exp(text))}");
@@ -1094,7 +393,7 @@ def main() -> int:
 	app_state["options"] = parser.parse_args();
 	app_state["dicemode"] = "";
 	app_state["dicemodes"] = {};
-	app_state["rdp"] = Rdp.Rdp();
+	app_state["rdp"] = Rdp();
 	app_state["done"] = False;
 
 	# Are we running in unit mode?
@@ -1116,7 +415,11 @@ def main() -> int:
 
 	if app_state["options"].load is not None:
 		for filename in app_state["options"].load:
-			load_dicemodes(filename, app_state["dicemodes"]);
+			if os.path.isfile(filename):
+				load_dicemodes(filename, app_state["dicemodes"]);
+
+	# TODO can we move dice rolls and math into threads?
+	#  would improve performance and prevent the discord mode from complaining about heartbeats
 
 	# Select which main loop based on mode argument
 	if app_state["options"].mode == "active":
