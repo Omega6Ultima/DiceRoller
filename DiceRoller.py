@@ -22,6 +22,8 @@ import RollerUtils;
 
 # Tab character for use in f-strings
 Tab: str = "\t";
+# Newline character for use in f-strings
+NL: str = "\n";
 # Comparison signs and their related functions
 Comparisons: dict[str, Callable] = {
 	"<=": lambda a, b: a <= b,
@@ -851,9 +853,9 @@ def count_dice(_: AppState, dice: str) -> str:
 	for i in RollerUtils.range_incl(1, dice_set.dice_sides):
 		just_amt: int = len(str(dice_set.dice_sides));
 		roll_count: int = results[0][0].count(i);
-		builder.append(f"#{i:>0{just_amt}} = {roll_count} ({round(roll_count / dice_set.num_dice * 100, 2)}%)");
+		builder.append(f"{NL}#{i:>0{just_amt}} = {roll_count} ({round(roll_count / dice_set.num_dice * 100, 2)}%)");
 
-	return "\n".join(builder);
+	return "".join(builder);
 
 
 HelpStr: str = f"""
