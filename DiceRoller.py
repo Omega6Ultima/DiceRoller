@@ -397,9 +397,6 @@ def main() -> int:
 			if os.path.isfile(filename):
 				load_dicemodes(filename, app_state["dicemodes"]);
 
-	# TODO can we move dice rolls and math into threads?
-	#  would improve performance and prevent the discord mode from complaining about heartbeats
-
 	# Select which main loop based on mode argument
 	if app_state["options"].mode == "active":
 		while not app_state["done"]:
@@ -452,6 +449,9 @@ def main() -> int:
 			reply: str = process_input(content, app_state);
 
 			if reply:
+				if len(reply) > 3900:
+					reply = "Reply message is too large for discord";
+
 				if app_state["dicemode"] != "":
 					reply = f"{app_state['dicemode']}\n{reply}";
 
