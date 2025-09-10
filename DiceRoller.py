@@ -99,10 +99,25 @@ class AppState(dict):
 
 
 def eval_fstr(template: str, **kwargs) -> str:
+	"""Delayed f-string evaluation"""
 	return eval(f"f'''{template}'''", kwargs);
 
 
+def discord_format(text: str) -> str:
+	"""Formats a string to be output in discord, escapes certain discord formatting characters"""
+	output: str = text;
+
+	output = output.replace("*", r"\*");
+
+	# Collapse multiple consecutive newlines into one
+	while "\n\n" in output:
+		output = output.replace("\n\n", "\n");
+
+	return output;
+
+
 def exit_main(app_state: AppState) -> str:
+	"""Sets the flag for exiting the main loop of active mode"""
 	if app_state["options"].mode == "active":
 		app_state["done"] = True;
 
@@ -113,17 +128,13 @@ def exit_main(app_state: AppState) -> str:
 
 def get_help(app_state: AppState, context: str = "") -> str:
 	"""Get general or contextual help"""
-	# Special case, tailor help to discord specific help
-	if app_state["options"].mode == "discord" and context == "":
-		context = "discord";
 
 	match context:
 		case "dicemode" | "dicemodes":
 			return DicemodeHelpStr;
-		case "discord":
-			return DiscordHelpStr;
 		case _:
-			return HelpStr;
+			# Use mode to tailor general help, i.e. exit and timer don't do anything in discord mode
+			return eval_fstr(HelpStr, Tab=Tab, mode=app_state['options'].mode);
 
 
 def start_timer(app_state: AppState, seconds: str = "", sound: str = "alarm-clock-1.wav") -> str:
@@ -150,11 +161,12 @@ def switch_dicemode(app_state: AppState, mode: str = "") -> str:
 		return f"No dicemode named '{mode}'";
 
 
-def inspect_dicemode(app_state: AppState, mode: str = ""):
+def inspect_dicemode(app_state: AppState, mode: str = "") -> str:
+	"""Outputs the action list for the given dicemode"""
 	if mode in app_state["dicemodes"]:
 		return "\n" + ("\n".join(app_state["dicemodes"][mode].actions));
 
-	print(f"No dicemode named '{mode}'");
+	return f"No dicemode named '{mode}'";
 
 
 def toss_coins(_: AppState, num: str = "1") -> str:
@@ -185,14 +197,14 @@ def count_dice(_: AppState, dice: str) -> str:
 	return "".join(builder);
 
 
-HelpStr: str = f"""
+HelpStr: str = """
 Commands:
 {Tab}help <context>{Tab * 2}get help with topic
-{Tab}exit{Tab * 4}exit the program
-{Tab}stop{Tab * 4}stop the program
-{Tab}quit{Tab * 4}quit the program
-{Tab}timer <sec> [sound]{Tab * 1}start a timer for <sec> seconds and with [sound]
-{Tab}clear{Tab * 4}clear the output
+{f'{Tab}exit{Tab * 4}exit the program' if mode == 'active' else ''}
+{f'{Tab}stop{Tab * 4}stop the program' if mode == 'active' else ''}
+{f'{Tab}quit{Tab * 4}quit the program' if mode == 'active' else ''}
+{f'{Tab}timer <sec> [sound]{Tab * 1}start a timer for <sec> seconds and with [sound]' if mode == 'active' else ''}
+{f'{Tab}clear{Tab * 4}clear the output' if mode == 'active' else ''}
 {Tab}coin{Tab * 4}toss a coin
 {Tab}coin <num>{Tab * 3}toss num coins
 {Tab}dicemodes{Tab * 3}list available dicemodes
@@ -241,39 +253,6 @@ print(damage){Tab}print "damage = <value of damage>"
 
 Example dicemode:
 {DefaultDicemodes['10_again']}
-""";
-DiscordHelpStr: str = f"""
-Commands:
-{Tab}help <context>{Tab * 2}get help with topic
-{Tab}coin{Tab * 4}toss a coin
-{Tab}coin <num>{Tab * 3}toss num coins
-{Tab}dicemodes{Tab * 3}list available dicemodes
-{Tab}dicemode <mode>{Tab * 2}switch to <mode> dicemode, all subsequent rolls with be processed through that dicemode
-{Tab}inspect <mode>{Tab * 2}print the action list for given dicemode
-Dice rolls:
-{Tab}1d4{Tab * 5}roll a 1d4
-{Tab}1d6+1{Tab * 4}roll a 1d6 and add 1
-{Tab}1d8-3{Tab * 4}roll a 1d8 and subtract 3
-{Tab}3\\*1d10+2{Tab * 3}roll 3 sets of 1d10+2
-{Tab}6d12{{1}}{Tab * 4}roll 6d12 and reroll any 1's
-{Tab}6d12{{<6}}{Tab * 3}roll 6d12 and reroll any matching the condition
-{Tab}6d12{{low}}{Tab * 3}roll 6d12 and reroll the lowest roll
-{Tab}6d12{{high}}{Tab * 3}roll 6d12 and reroll the highest roll
-{Tab}3d20[20]{Tab * 3}roll 3d20 and remove any and all 20's
-{Tab}3d20[>=16]{Tab * 3}roll 3d20 and remove any rolls matching the condition
-{Tab}3d20[low]{Tab * 3}roll 3d20 and remove the lowest roll
-{Tab}3d20[high]{Tab * 3}roll 3d20 and remove the highest roll
-Math expressions:
-{Tab}10 + 14{Tab * 4}addition
-{Tab}54 - 19{Tab * 4}subtraction
-{Tab}4 \\* 8{Tab * 4}multiplication
-{Tab}27 / 9{Tab * 4}division
-{Tab}50 % 4{Tab * 4}modulo (division remainder)
-{Tab}2 ^ 3{Tab * 4}exponents
-{Tab}3 \\* ( 2 + 7 ){Tab * 2}parenthesis
-{Tab}'1,000 \\* 5,000'{Tab * 2}using numbers with commas needs the expression quoted 
-{Tab}
-coin, 1d6, 12 \\* 2{Tab * 2}multiple commands/dice/math can done at the same time
 """;
 Commands: dict[str, Callable] = {
 	"exit": exit_main,
@@ -476,7 +455,7 @@ def main() -> int:
 				if app_state["dicemode"] != "":
 					reply = f"{app_state['dicemode']}\n{reply}";
 
-				await message.channel.send(reply);
+				await message.channel.send(discord_format(reply));
 
 
 		# Load a .env file to get the secret stuff
