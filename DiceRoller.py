@@ -1,4 +1,5 @@
 import argparse;
+import asyncio
 import logging;
 import os;
 import platform;
@@ -270,6 +271,7 @@ Commands: dict[str, Callable] = {
 
 
 def load_dicemodes(filename: str, dicemodes: dict[str, DiceMode]) -> None:
+	"""Load DiceModes from filename and store in dicemode"""
 	with open(filename, "r") as mode_file:
 		parsing_mode: str = "";
 		mode_actions: list[str] = [];
@@ -296,7 +298,8 @@ def load_dicemodes(filename: str, dicemodes: dict[str, DiceMode]) -> None:
 			dicemodes[parsing_mode] = DiceMode(parsing_mode, mode_actions);
 
 
-def process_input(text_in: str, app_state: AppState) -> str:
+async def process_input(text_in: str, app_state: AppState) -> str:
+	"""Figure what to do with text_in and do it"""
 	texts: list[str];
 	output: list[str] = [];
 
@@ -359,6 +362,7 @@ def process_input(text_in: str, app_state: AppState) -> str:
 
 
 def main() -> int:
+	"""Main function, parses command line args, loads dicemodes, and runs a loop according to mode"""
 	app_state: AppState = AppState();
 
 	# Parse command line options
@@ -401,13 +405,12 @@ def main() -> int:
 	if app_state["options"].mode == "active":
 		while not app_state["done"]:
 			prompt: str = input("Enter commands, dice, or math: ").strip();
-
-			output: str = process_input(prompt, app_state);
+			output: str = asyncio.run(process_input(prompt, app_state));
 
 			print(output);
 	elif app_state["options"].mode == "auto":
 		prompt: str = app_state["options"].input.strip();
-		output: str = process_input(prompt, app_state);
+		output: str = asyncio.run(process_input(prompt, app_state));
 
 		print(output);
 	elif app_state["options"].mode == "discord":
@@ -446,7 +449,7 @@ def main() -> int:
 				content = content.replace(user.mention, "").strip();
 
 			# Process input
-			reply: str = process_input(content, app_state);
+			reply: str = await process_input(content, app_state);
 
 			if reply:
 				if len(reply) > 3900:
