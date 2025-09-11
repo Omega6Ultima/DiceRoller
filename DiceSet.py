@@ -141,7 +141,7 @@ class DiceSet:
 			num_dice: str = text[:text.find("d")];
 			dice_side: str = text[text.find("d") + 1:];
 
-			mods: dict[str, any] = {};
+			mods: dict[str, int | str] = {};
 
 			# Peel off modifiers starting from the front or back and work inwards
 			if "*" in num_dice:

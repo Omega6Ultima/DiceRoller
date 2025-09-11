@@ -60,7 +60,7 @@ class Rdp:
 		return result;
 
 
-	def _eval_exp1(self, result: float):
+	def _eval_exp1(self, result: float) -> float | None:
 		"""Handle variables"""
 		if self.tok_type == Rdp.TokenType.Variable:
 			temp_tok_type: Rdp.TokenType = self.tok_type;
@@ -77,14 +77,14 @@ class Rdp:
 				self._get_token();
 				result = self._eval_exp2(result);
 				self.vars[temp_token] = result;
-				return;
+				return None;
 
 		result = self._eval_exp2(result);
 
 		return result;
 
 
-	def _eval_exp2(self, result: float):
+	def _eval_exp2(self, result: float) -> float:
 		"""Handle addition and subtraction"""
 		result = self._eval_exp3(result);
 		op: str = self.token;
@@ -106,7 +106,7 @@ class Rdp:
 		return result;
 
 
-	def _eval_exp3(self, result: float):
+	def _eval_exp3(self, result: float) -> float:
 		"""Handle multiplication, division, and modulo"""
 		temp: float = 0.0;
 
@@ -138,7 +138,7 @@ class Rdp:
 		return result;
 
 
-	def _eval_exp4(self, result: float):
+	def _eval_exp4(self, result: float) -> float:
 		"""Handle exponents"""
 		exp: float = 0.0;
 
@@ -166,7 +166,7 @@ class Rdp:
 		return result;
 
 
-	def _eval_exp5(self, result: float):
+	def _eval_exp5(self, result: float) -> float:
 		op: str = "";
 
 		if self.tok_type == Rdp.TokenType.Delimiter and (self.token == '+' or self.token == '-'):
@@ -181,7 +181,7 @@ class Rdp:
 		return result;
 
 
-	def _eval_exp6(self, result: float):
+	def _eval_exp6(self, result: float) -> float:
 		"""Handle parenthesis"""
 		if self.token == "(":
 			self._get_token();
@@ -205,7 +205,7 @@ class Rdp:
 		return result;
 
 
-	def _atom(self):
+	def _atom(self) -> float:
 		"""Convert tokens into values"""
 		if self.tok_type == Rdp.TokenType.Variable:
 			result = self._find_var(self.token);
@@ -219,7 +219,7 @@ class Rdp:
 			raise SyntaxError("Syntax error. Unexpected end of expression");
 
 
-	def _get_token(self):
+	def _get_token(self) -> None:
 		"""Get the next token in the expression"""
 		temp: str = "";
 		self.tok_type: Rdp.TokenType = Rdp.TokenType.NotToken;

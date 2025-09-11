@@ -6,7 +6,7 @@ import platform;
 import sys;
 import threading;
 import unittest;
-from typing import Callable;
+from typing import Any, Callable;
 
 import discord;
 import dotenv;
@@ -341,7 +341,7 @@ async def process_input(text_in: str, app_state: AppState) -> str:
 				if app_state["dicemode"]:
 					dicemode: DiceMode = app_state["dicemodes"][app_state["dicemode"]];
 
-					dm_vars: dict[str, any] = dicemode.run(text, app_state["options"].debug, capture_print=True);
+					dm_vars: dict[str, Any] = dicemode.run(text, app_state["options"].debug, capture_print=True);
 
 					output.append(f"{text} => {dm_vars["output"]}");
 				else:

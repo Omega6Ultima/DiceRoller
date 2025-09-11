@@ -1,7 +1,7 @@
 import io;
 import sys;
 from io import StringIO;
-from typing import TextIO;
+from typing import Any, TextIO;
 
 from DiceSet import DiceSet, DiceError, Comparisons, Calculations;
 
@@ -17,7 +17,7 @@ class DiceMode:
 		self.output: TextIO | StringIO = sys.stdout;
 
 
-	def run(self, dice: str, debug: bool = False, capture_print: bool = False) -> dict[str, any]:
+	def run(self, dice: str, debug: bool = False, capture_print: bool = False) -> dict[str, Any]:
 		self.done = False;
 		self.loop_entry = None;
 		self.loop_end = None;
@@ -28,7 +28,7 @@ class DiceMode:
 
 		diceset: DiceSet = DiceSet.from_str(dice);
 
-		mode_vars: dict[str, any] = {
+		mode_vars: dict[str, Any] = {
 			"True": True,
 			"False": False,
 			"rolls": [],
@@ -77,7 +77,7 @@ class DiceMode:
 		return arg_list;
 
 
-	def _execute_action(self, action: str, diceset: DiceSet, mode_vars: dict[str, any], debug: bool = False) -> None:
+	def _execute_action(self, action: str, diceset: DiceSet, mode_vars: dict[str, Any], debug: bool = False) -> None:
 		if self.loop_entry is not None:
 			if self.action_index > self.loop_end:
 				self.action_index = self.loop_entry;
