@@ -170,7 +170,7 @@ def inspect_dicemode(app_state: AppState, mode: str = "") -> str:
 	return f"No dicemode named '{mode}'";
 
 
-def toss_coins(_: AppState, num: str = "1") -> str:
+def toss_coins(_app_state: AppState, num: str = "1") -> str:
 	"""Toss coin(s) aka 1d2's"""
 	num_coins: int = int(num);
 
@@ -181,7 +181,7 @@ def toss_coins(_: AppState, num: str = "1") -> str:
 	return str(coin_results);
 
 
-def count_dice(_: AppState, dice: str) -> str:
+def count_dice(_app_state: AppState, dice: str) -> str:
 	"""Count the instances of rolls"""
 	if dice == "":
 		return "No dice given to count";
@@ -418,11 +418,12 @@ def main() -> int:
 		log_handler = logging.FileHandler(filename="discord.log", encoding="utf-8", mode="w");
 
 		# Set up default intents and reading message content
-		intents = discord.Intents.default();
-		intents.message_content = True;
+		intents: discord.Intents = discord.Intents.default();
+		# PyCharm incorrectly reports 2 warnings here due to how the Intents class populates flags
+		intents.message_content = True; # noqa
 
 		# Create discord client
-		client = discord.Client(intents=intents);
+		client: discord.Client = discord.Client(intents=intents);
 
 
 		# Client event-driven functions
