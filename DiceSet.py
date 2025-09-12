@@ -302,7 +302,7 @@ class DiceSet:
 			for dice in self.sub_dice:
 				dice_str: str = str(dice);
 
-				# Remove subdice total and equal sign
+				# Remove sub_dice total and equal sign
 				builder.append(f", {dice_str[:dice_str.find("=") - 1]}");
 
 		builder.append(f" = {int(self)}");
