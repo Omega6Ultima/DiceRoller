@@ -15,7 +15,7 @@ class DiceModeTest(unittest.TestCase):
 	@override
 	def tearDown(self):
 		end_time: float = time.time();
-		print(f"Test '{self._testMethodName}' took {end_time - self.start_time} seconds", flush=True);
+		print(f"Test '{self._testMethodName}' took {end_time - self.start_time} seconds");
 
 
 	def test_10_again(self):
@@ -27,7 +27,12 @@ class DiceModeTest(unittest.TestCase):
 
 		ten_again: DiceMode = DiceMode("10_again", actions);
 
-		self.assertTrue(ten_again.validate("1d10"));
+		valid: tuple[bool, str] = ten_again.validate("20d10");
+
+		if valid[1]:
+			print(valid[1]);
+
+		self.assertTrue(valid);
 
 		for num in [10, 20, 30, 40]:
 			dm_vars = ten_again.run(f"{num}d10", capture_print=True, debug=False);
@@ -45,7 +50,12 @@ class DiceModeTest(unittest.TestCase):
 
 		nine_again: DiceMode = DiceMode("9_again", actions);
 
-		self.assertTrue(nine_again.validate("1d10"));
+		valid: tuple[bool, str] = nine_again.validate("20d10");
+
+		if valid[1]:
+			print(valid[1]);
+
+		self.assertTrue(valid);
 
 		for num in [10, 20, 30, 40]:
 			dm_vars = nine_again.run(f"{num}d10", capture_print=True, debug=False);
@@ -63,7 +73,12 @@ class DiceModeTest(unittest.TestCase):
 
 		norm_damage: DiceMode = DiceMode("Hero_normal", actions);
 
-		self.assertTrue(norm_damage.validate("1d6"));
+		valid: tuple[bool, str] = norm_damage.validate("1d6");
+
+		if valid[1]:
+			print(valid[1]);
+
+		self.assertTrue(valid);
 
 		for num in [10, 20, 30, 40]:
 			dm_vars = norm_damage.run(f"{num}d6", capture_print=True, debug=False);
@@ -81,7 +96,12 @@ class DiceModeTest(unittest.TestCase):
 
 		kill_damage: DiceMode = DiceMode("Hero_kill", actions);
 
-		self.assertTrue(kill_damage.validate("1d6"));
+		valid: tuple[bool, str] = kill_damage.validate("1d6");
+
+		if valid[1]:
+			print(valid[1]);
+
+		self.assertTrue(valid);
 
 		for num in [10, 20, 30, 40]:
 			dm_vars = kill_damage.run(f"{num}d6", capture_print=True, debug=False);

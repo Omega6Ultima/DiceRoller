@@ -356,13 +356,15 @@ class DiceMode:
 		return arg_list;
 
 
-	def validate(self, dice: str) -> bool:
+	def validate(self, dice: str, capture_output: bool = False) -> tuple[bool, str]:
 		# Initialize execution state
 		self.done = False;
 		self.loop_entry = None;
 		self.loop_end = None;
 		self.action_index = 0;
+		# Create a StringIO to capture output, but we just drop it like its hot when we're done
 		self.output = io.StringIO();
+		v_output: StringIO = StringIO();
 
 		diceset: DiceSet = DiceSet.from_str(dice);
 
@@ -377,18 +379,18 @@ class DiceMode:
 		while not self.done:
 			# Check to see if the current action is a valid action
 			if not any([self.actions[self.action_index].lstrip().startswith(f"{action}(") for action in self._Actions]):
-				print(f"Validate failed. Unknown action({self.actions[self.action_index]}) on line{self.action_index}");
+				print(f"Validate failed. Unknown action({self.actions[self.action_index]}) on line{self.action_index}", file=(v_output if capture_output else sys.stdout));
 
-				return False;
+				return False, v_output.getvalue();
 
 			# Execute single action
 			self._execute_action(self.actions[self.action_index], diceset, mode_vars);
 
 			if self.done == True and self.action_index < len(self.actions):
 				# Exited early, probably due to an error
-				print(f"Validate failed. Last action({self.actions[self.action_index]}) on line {self.action_index} cause an early exit");
+				print(f"Validate failed. Last action({self.actions[self.action_index]}) on line {self.action_index} cause an early exit", file=(v_output if capture_output else sys.stdout));
 
-				return False;
+				return False, v_output.getvalue();
 
 			# Move to next action
 			self.action_index += 1;
@@ -400,7 +402,7 @@ class DiceMode:
 				else:
 					self.done = True;
 
-		return self.done;
+		return self.done, v_output.getvalue();
 
 
 	def run(self, dice: str, debug: bool = False, capture_print: bool = False) -> dict[str, Any]:
