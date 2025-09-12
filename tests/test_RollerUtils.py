@@ -1,9 +1,22 @@
+import time;
 import unittest;
+
+from typing import override;
 
 import RollerUtils;
 
 
 class RollerUtilsTest(unittest.TestCase):
+	@override
+	def setUp(self):
+		self.start_time: float = time.time();
+
+	@override
+	def tearDown(self):
+		end_time: float = time.time();
+		print(f"Test '{self._testMethodName}' took {end_time - self.start_time} seconds");
+
+
 	def test_range_incl(self):
 		self.assertListEqual(RollerUtils.range_incl(1, 4), [1, 2, 3, 4]);
 		self.assertListEqual(RollerUtils.range_incl(2, 10), [2, 3, 4, 5, 6, 7, 8, 9, 10]);

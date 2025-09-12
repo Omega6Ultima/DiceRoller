@@ -1,11 +1,22 @@
+import time;
 import unittest;
+
+from typing_extensions import override;
 
 import Rdp;
 
 
 class TestRdp(unittest.TestCase):
+	@override
 	def setUp(self):
 		self.rdp: Rdp.Rdp = Rdp.Rdp();
+		self.start_time: float = time.time();
+
+
+	@override
+	def tearDown(self):
+		end_time: float = time.time();
+		print(f"Test '{self._testMethodName}' took {end_time - self.start_time} seconds");
 
 
 	def test_add(self):

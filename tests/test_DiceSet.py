@@ -1,10 +1,24 @@
+import time;
 import unittest;
+
+from typing_extensions import override;
 
 import RollerUtils;
 from DiceSet import DiceError, DiceSet;
 
 
 class DiceSetTest(unittest.TestCase):
+	@override
+	def setUp(self):
+		self.start_time: float = time.time();
+
+
+	@override
+	def tearDown(self):
+		end_time: float = time.time();
+		print(f"Test '{self._testMethodName}' took {end_time - self.start_time} seconds");
+
+
 	def _common_asserts(self, result: tuple[list[int], int], dice_sides: int) -> None:
 		self.assertFalse(any([r < 1 for r in result[0]]), msg="Roll is less than 1");
 		self.assertFalse(any([r > dice_sides for r in result[0]]), msg="Roll is greater than maximum die value");
