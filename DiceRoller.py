@@ -24,6 +24,7 @@ NL: str = "\n";
 # The default dicemode filename
 DefaultDicemodeFile: str = "dicemodes.txt";
 # The pre-defined dicemodes, will be written to file if it doesn't exist
+# noinspection SpellCheckingInspection
 DefaultDicemodes: dict[str, str] = {
 	"10_again":"""
 dicemode(10_again):
@@ -170,6 +171,48 @@ def inspect_dicemode(app_state: AppState, mode: str = "") -> str:
 	return f"No dicemode named '{mode}'";
 
 
+def submit_dicemode(app_state: AppState, text: str = "") -> bool:
+	"""Enter a mode-dependant submit (sub)mode, returns whether a dicemode was added"""
+	match app_state["options"].mode:
+		case "active" | "auto":
+			print("Entering dicemode submission mode, enter an empty line to exit");
+			name: str = "";
+			action_list: list[str] = [];
+			submit_done: bool = False;
+
+			while not submit_done:
+				name = input("Enter a name for the new dicemode: ");
+
+				if name == "":
+					return False;
+
+				if name in app_state["dicemodes"]:
+					print(f"A dicemode named '{name}' already exists");
+				else:
+					submit_done = True;
+
+			submit_done = False;
+
+			while not submit_done:
+				line: str = input("Enter an action: ");
+
+				if line == "":
+					submit_done = True;
+
+				action_list.append(line);
+
+			if name and action_list:
+				app_state["dicemodes"][name] = DiceMode(name, action_list);
+
+				return True;
+			else:
+				return False;
+		case "discord":
+			return False;
+		case _:
+			return False;
+
+
 def toss_coins(_app_state: AppState, num: str = "1") -> str:
 	"""Toss coin(s) aka 1d2's"""
 	num_coins: int = int(num);
@@ -211,6 +254,8 @@ Commands:
 {Tab}dicemodes{Tab * 3}list available dicemodes
 {Tab}dicemode <mode>{Tab * 2}switch to <mode> dicemode, all subsequent rolls with be processed through that dicemode
 {Tab}inspect <mode>{Tab * 2}print the action list for given dicemode
+{Tab}submit{f' <text>{Tab * 2}' if mode == 'discord' else f'{Tab * 4}'}submit a new dicemode
+{Tab}count <dice>{Tab * 2}roll the 'dice' and count each roll result and display the statistics
 Dice rolls:
 {Tab}1d4{Tab * 5}roll a 1d4
 {Tab}1d6+1{Tab * 4}roll a 1d6 and add 1
@@ -236,6 +281,7 @@ Math expressions:
 {Tab}
 coin, 1d6, 12 * 2{Tab * 2}multiple commands/dice/math can done at the same time
 """;
+# noinspection SpellCheckingInspection
 DicemodeHelpStr: str = f"""
 dicemode actions:
 store(0, zero){Tab}store 0 into the var 'zero'
@@ -256,16 +302,17 @@ Example dicemode:
 {DefaultDicemodes['10_again']}
 """;
 Commands: dict[str, Callable] = {
+	"help": get_help,
 	"exit": exit_main,
 	"quit": exit_main,
 	"stop": exit_main,
-	"help": get_help,
 	"timer": start_timer,
+	"clear": lambda state: os.system("cls") if "win" in platform.system().lower() else os.system("clear"),
+	"coin": toss_coins,
 	"dicemodes": lambda state: ", ".join(state["dicemodes"].keys()),
 	"dicemode": switch_dicemode,
 	"inspect": inspect_dicemode,
-	"clear": lambda state: os.system("cls") if "win" in platform.system().lower() else os.system("clear"),
-	"coin": toss_coins,
+	"submit": submit_dicemode,
 	"count": count_dice,
 };
 
@@ -396,6 +443,9 @@ def main() -> int:
 
 	load_dicemodes(DefaultDicemodeFile, app_state["dicemodes"]);
 
+	if os.path.isfile("dicemodes_user.txt"):
+		load_dicemodes("dicemodes_user.txt", app_state["dicemodes"]);
+
 	if app_state["options"].load is not None:
 		for filename in app_state["options"].load:
 			if os.path.isfile(filename):
@@ -404,7 +454,8 @@ def main() -> int:
 	# Select which main loop based on mode argument
 	if app_state["options"].mode == "active":
 		while not app_state["done"]:
-			prompt: str = input("Enter commands, dice, or math: ").strip();
+			prompt: str = input(f"Enter commands, dice, or math{f' ({app_state["dicemode"]})' if app_state['dicemode'] else ''}: ").strip();
+
 			output: str = asyncio.run(process_input(prompt, app_state));
 
 			print(output);
@@ -453,7 +504,7 @@ def main() -> int:
 			reply: str = await process_input(content, app_state);
 
 			if reply:
-				if len(reply) > 3900:
+				if len(reply) > 3950:
 					reply = "Reply message is too large for discord";
 
 				if app_state["dicemode"] != "":
@@ -467,6 +518,22 @@ def main() -> int:
 
 		# Run client
 		client.run(os.getenv("BOT_TOKEN"), log_handler=log_handler);
+
+	"""
+dicemode(Test):
+    roll(dice)
+    total(sum)
+    print(sum)"""
+	if any([d not in DefaultDicemodes for d in app_state["dicemodes"]]):
+		with open("dicemodes_user.txt", "w") as outfile:
+			for name, mode in app_state["dicemodes"].items():
+				if name not in DefaultDicemodes:
+					outfile.write(f"dicemode({name}):{NL}");
+
+					for action in mode.actions:
+						outfile.write(f"{Tab}{action}{NL}");
+
+					outfile.write(NL);
 
 	return 0;
 

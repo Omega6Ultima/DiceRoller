@@ -15,7 +15,7 @@ class DiceMode:
 		var: str = args[1];
 
 		if debug:
-			print(f"  Storing {val} into '{var}'", file=self.output);
+			print(f"  Storing {val} into '{var}'", file=self._output);
 
 		mode_vars[var] = val;
 
@@ -27,12 +27,12 @@ class DiceMode:
 		die_sides: int = int(args[0].removeprefix("d"));
 
 		if debug:
-			print(f"  Checking dice are d{die_sides}'s", file=self.output);
+			print(f"  Checking dice are d{die_sides}'s", file=self._output);
 
 		if not diceset.verify_dice(die_sides):
-			self.done = True;
+			self._done = True;
 
-			print(f"Using dicemode {self.name} with non-d{die_sides}, dice passed are d{diceset.dice_sides}", file=self.output);
+			print(f"Using dicemode {self.name} with non-d{die_sides}, dice passed are d{diceset.dice_sides}", file=self._output);
 
 
 	def _roll(self, action: str, diceset: DiceSet, mode_vars: dict[str, Any], debug: bool = False):
@@ -45,18 +45,18 @@ class DiceMode:
 		try:
 			if dice == "dice":
 				if debug:
-					print(f"  Rolling {diceset.display()}", file=self.output);
+					print(f"  Rolling {diceset.display()}", file=self._output);
 
 				result.extend(diceset.get_results());
 			else:
 				if debug:
-					print(f"  Rolling {dice}", file=self.output);
+					print(f"  Rolling {dice}", file=self._output);
 
 				result.extend(DiceSet.from_str(dice).get_results());
 		except DiceError as e:
-			print(e, file=self.output);
+			print(e, file=self._output);
 
-			self.done = True;
+			self._done = True;
 
 			return;
 
@@ -76,13 +76,13 @@ class DiceMode:
 
 		try:
 			if debug:
-				print(f"  Rolling {dice} and storing into '{var}'", file=self.output);
+				print(f"  Rolling {dice} and storing into '{var}'", file=self._output);
 
 			result += int(DiceSet.from_str(dice));
 		except DiceError as e:
-			print(e, file=self.output);
+			print(e, file=self._output);
 
-			self.done = True;
+			self._done = True;
 
 			return;
 
@@ -96,7 +96,7 @@ class DiceMode:
 		var: str = args[0];
 
 		if debug:
-			print(f"  Totaling dice rolls and storing into '{var}'", file=self.output);
+			print(f"  Totaling dice rolls and storing into '{var}'", file=self._output);
 
 		mode_vars[var] = sum(mode_vars["rolls"]) + mode_vars["rolls_adj"];
 
@@ -110,14 +110,14 @@ class DiceMode:
 		var: str = args[2];
 
 		if comp not in Comparisons:
-			print(f"'{comp}' is not a valid comparison", file=self.output);
+			print(f"'{comp}' is not a valid comparison", file=self._output);
 
-			self.done = True;
+			self._done = True;
 
 			return;
 
 		if debug:
-			print(f"  Counting rolls that match {comp} {val} and storing into '{var}'", file=self.output);
+			print(f"  Counting rolls that match {comp} {val} and storing into '{var}'", file=self._output);
 
 		count: int = 0;
 
@@ -126,7 +126,7 @@ class DiceMode:
 				count += 1;
 
 		if debug:
-			print(f"  Matching rolls: {count}, Non-matching rolls: {len(mode_vars["rolls"]) - count}", file=self.output);
+			print(f"  Matching rolls: {count}, Non-matching rolls: {len(mode_vars["rolls"]) - count}", file=self._output);
 
 		mode_vars[var] = count;
 
@@ -140,29 +140,29 @@ class DiceMode:
 		var2: str = args[2];
 
 		if var1 not in mode_vars:
-			print(f"'{var1}' has not been set before use", file=self.output);
+			print(f"'{var1}' has not been set before use", file=self._output);
 
-			self.done = True;
+			self._done = True;
 
 			return;
 
 		if op not in Calculations:
-			print(f"'{op}' is not a valid calculation", file=self.output);
+			print(f"'{op}' is not a valid calculation", file=self._output);
 
-			self.done = True;
+			self._done = True;
 
 			return;
 
 		if var2 not in mode_vars:
-			print(f"'{var2}' has not been set before use", file=self.output);
+			print(f"'{var2}' has not been set before use", file=self._output);
 
-			self.done = True;
+			self._done = True;
 
 			return;
 
 		if debug:
-			print(f"  Calculating '{var1} {op} {var2}' and storing into '{var1}'", file=self.output);
-			print(f"  {mode_vars[var1]} {op} {mode_vars[var2]} = {Calculations[op](mode_vars[var1], mode_vars[var2])}", file=self.output);
+			print(f"  Calculating '{var1} {op} {var2}' and storing into '{var1}'", file=self._output);
+			print(f"  {mode_vars[var1]} {op} {mode_vars[var2]} = {Calculations[op](mode_vars[var1], mode_vars[var2])}", file=self._output);
 
 		mode_vars[var1] = Calculations[op](mode_vars[var1], mode_vars[var2]);
 
@@ -177,29 +177,29 @@ class DiceMode:
 		sub_action = args[3];
 
 		if var1 not in mode_vars:
-			print(f"'{var1}' has not been set before use", file=self.output);
+			print(f"'{var1}' has not been set before use", file=self._output);
 
-			self.done = True;
+			self._done = True;
 
 			return;
 
 		if comp not in Comparisons:
-			print(f"'{comp}' is not a valid calculation", file=self.output);
+			print(f"'{comp}' is not a valid calculation", file=self._output);
 
-			self.done = True;
+			self._done = True;
 
 			return;
 
 		if var2 not in mode_vars:
-			print(f"'{var2}' has not been set before use", file=self.output);
+			print(f"'{var2}' has not been set before use", file=self._output);
 
-			self.done = True;
+			self._done = True;
 
 			return;
 
 		if debug:
-			print(f"  If '{var1} {comp} {var2}' is True, then execute '{sub_action}'", file=self.output);
-			print(f"  {mode_vars[var1]} {comp} {mode_vars[var2]} = {Comparisons[comp](mode_vars[var1], mode_vars[var2])}", file=self.output);
+			print(f"  If '{var1} {comp} {var2}' is True, then execute '{sub_action}'", file=self._output);
+			print(f"  {mode_vars[var1]} {comp} {mode_vars[var2]} = {Comparisons[comp](mode_vars[var1], mode_vars[var2])}", file=self._output);
 
 		if Comparisons[comp](mode_vars[var1], mode_vars[var2]):
 			self._execute_action(sub_action, diceset, mode_vars, debug);
@@ -213,14 +213,14 @@ class DiceMode:
 		sub_action: str = args[1];
 
 		if var not in mode_vars:
-			print(f"'{var}' has not been set before use", file=self.output);
+			print(f"'{var}' has not been set before use", file=self._output);
 
-			self.done = True;
+			self._done = True;
 
 			return;
 
 		if debug:
-			print(f"  Looping {int(mode_vars[var])} times and running '{sub_action}'", file=self.output);
+			print(f"  Looping {int(mode_vars[var])} times and running '{sub_action}'", file=self._output);
 
 		for _ in range(int(mode_vars[var])):
 			self._execute_action(sub_action, diceset, mode_vars, debug);
@@ -235,59 +235,59 @@ class DiceMode:
 		var2: str = args[2];
 
 		if var1 not in mode_vars:
-			print(f"'{var1}' has not been set before use", file=self.output);
+			print(f"'{var1}' has not been set before use", file=self._output);
 
-			self.done = True;
+			self._done = True;
 
 			return;
 
 		if comp not in Comparisons:
-			print(f"'{comp}' is not a valid calculation", file=self.output);
+			print(f"'{comp}' is not a valid calculation", file=self._output);
 
-			self.done = True;
+			self._done = True;
 
 			return;
 
 		if var2 not in mode_vars:
-			print(f"'{var2}' has not been set before use", file=self.output);
+			print(f"'{var2}' has not been set before use", file=self._output);
 
-			self.done = True;
+			self._done = True;
 
 			return;
 
 		# Calculate loop_end
-		if self.loop_end is None:
-			loop_end: int = self.action_index + 1;
+		if self._loop_end is None:
+			loop_end: int = self._action_index + 1;
 			indent_level: str = self.actions[loop_end].count("\t") * "\t";
 
 			while self.actions[loop_end].startswith(indent_level):
 				loop_end += 1;
 
-			self.loop_end = loop_end - 1;
+			self._loop_end = loop_end - 1;
 
 		if debug:
-			print(f"  Looping while '{var1} {comp} {var2}' from action #{self.action_index} to #{self.loop_end}", file=self.output);
-			print(f"  {mode_vars[var1]} {comp} {mode_vars[var2]} = {Comparisons[comp](mode_vars[var1], mode_vars[var2])}", file=self.output);
+			print(f"  Looping while '{var1} {comp} {var2}' from action #{self._action_index} to #{self._loop_end}", file=self._output);
+			print(f"  {mode_vars[var1]} {comp} {mode_vars[var2]} = {Comparisons[comp](mode_vars[var1], mode_vars[var2])}", file=self._output);
 
 		if Comparisons[comp](mode_vars[var1], mode_vars[var2]):
-			self.loop_entry = self.action_index;
+			self._loop_entry = self._action_index;
 		else:
-			self.action_index = self.loop_end;
-			self.loop_entry = None;
-			self.loop_end = None;
+			self._action_index = self._loop_end;
+			self._loop_entry = None;
+			self._loop_end = None;
 
 
 	def _break(self, _action: str, _diceset: DiceSet, _mode_vars: dict[str, Any], debug: bool = False):
 		"""Force the exiting of a while action without re-checking the condition"""
-		if self.loop_entry is None:
-			print("Break action outside of loop", file=self.output);
+		if self._loop_entry is None:
+			print("Break action outside of loop", file=self._output);
 
 		if debug:
-			print(f"  Breaking out from loop({self.loop_entry}-{self.loop_end})", file=self.output);
+			print(f"  Breaking out from loop({self._loop_entry}-{self._loop_end})", file=self._output);
 
-		self.action_index = self.loop_end;
-		self.loop_entry = None;
-		self.loop_end = None;
+		self._action_index = self._loop_end;
+		self._loop_entry = None;
+		self._loop_end = None;
 
 
 	def _print(self, action: str, _diceset: DiceSet, mode_vars: dict[str, Any], debug: bool = False):
@@ -297,16 +297,16 @@ class DiceMode:
 		var: str = args[0];
 
 		if var not in mode_vars:
-			print(f"'{var}' has not been set before use", file=self.output);
+			print(f"'{var}' has not been set before use", file=self._output);
 
-			self.done = True;
+			self._done = True;
 
 			return;
 
 		if debug:
-			print(f"  Printing value of '{var}'", file=self.output);
+			print(f"  Printing value of '{var}'", file=self._output);
 
-		print(f"{var} = {mode_vars[var]}", file=self.output);
+		print(f"{var} = {mode_vars[var]}", file=self._output);
 
 
 	_Actions: dict[str, Callable] = {
@@ -329,11 +329,11 @@ class DiceMode:
 	def __init__(self, name: str, actions: list[str]):
 		self.name: str = name;
 		self.actions: list[str] = actions.copy();
-		self.action_index: int = 0;
-		self.done: bool = False;
-		self.loop_entry: None | int = None;
-		self.loop_end: None | int = None;
-		self.output: TextIO | StringIO = sys.stdout;
+		self._action_index: int = 0;
+		self._done: bool = False;
+		self._loop_entry: None | int = None;
+		self._loop_end: None | int = None;
+		self._output: TextIO | StringIO = sys.stdout;
 
 
 	@staticmethod
@@ -358,12 +358,12 @@ class DiceMode:
 
 	def validate(self, dice: str, capture_output: bool = False) -> tuple[bool, str]:
 		# Initialize execution state
-		self.done = False;
-		self.loop_entry = None;
-		self.loop_end = None;
-		self.action_index = 0;
+		self._done = False;
+		self._loop_entry = None;
+		self._loop_end = None;
+		self._action_index = 0;
 		# Create a StringIO to capture output, but we just drop it like its hot when we're done
-		self.output = io.StringIO();
+		self._output = io.StringIO();
 		v_output: StringIO = StringIO();
 
 		diceset: DiceSet = DiceSet.from_str(dice);
@@ -376,44 +376,49 @@ class DiceMode:
 			"rolls_adj": 0,
 		};
 
-		while not self.done:
+		while not self._done:
 			# Check to see if the current action is a valid action
-			if not any([self.actions[self.action_index].lstrip().startswith(f"{action}(") for action in self._Actions]):
-				print(f"Validate failed. Unknown action({self.actions[self.action_index]}) on line{self.action_index}", file=(v_output if capture_output else sys.stdout));
+			if not any([self.actions[self._action_index].lstrip().startswith(f"{action}(") for action in self._Actions]):
+				print(f"Validate failed. Unknown action({self.actions[self._action_index]}) on line{self._action_index}", file=(v_output if capture_output else sys.stdout));
 
 				return False, v_output.getvalue();
 
 			# Execute single action
-			self._execute_action(self.actions[self.action_index], diceset, mode_vars);
+			try:
+				self._execute_action(self.actions[self._action_index], diceset, mode_vars);
+			except Exception as e:
+				print(e, file=(v_output if capture_output else sys.stdout));
 
-			if self.done == True and self.action_index < len(self.actions):
+				return False, v_output.getvalue();
+
+			if self._done == True and self._action_index < len(self.actions):
 				# Exited early, probably due to an error
-				print(f"Validate failed. Last action({self.actions[self.action_index]}) on line {self.action_index} cause an early exit", file=(v_output if capture_output else sys.stdout));
+				print(f"Validate failed. Last action({self.actions[self._action_index]}) on line {self._action_index} cause an early exit", file=(v_output if capture_output else sys.stdout));
 
 				return False, v_output.getvalue();
 
 			# Move to next action
-			self.action_index += 1;
+			self._action_index += 1;
 
-			if self.action_index >= len(self.actions):
+			if self._action_index >= len(self.actions):
 				# If the end of the action list is hit, and we are in a loop, go back to loop_entry
-				if self.loop_entry is not None:
-					self.action_index = self.loop_entry;
+				if self._loop_entry is not None:
+					self._action_index = self._loop_entry;
 				else:
-					self.done = True;
+					self._done = True;
 
-		return self.done, v_output.getvalue();
+		return self._done, v_output.getvalue();
 
 
 	def run(self, dice: str, debug: bool = False, capture_print: bool = False) -> dict[str, Any]:
 		# Initialize execution state
-		self.done = False;
-		self.loop_entry = None;
-		self.loop_end = None;
-		self.action_index = 0;
+		self._done = False;
+		self._loop_entry = None;
+		self._loop_end = None;
+		self._action_index = 0;
 
 		if capture_print:
-			self.output = io.StringIO();
+			self._output = io.StringIO();
 
 		diceset: DiceSet = DiceSet.from_str(dice);
 
@@ -425,43 +430,43 @@ class DiceMode:
 			"rolls_adj": 0,
 		};
 
-		while not self.done:
+		while not self._done:
 			# Execute single action
-			self._execute_action(self.actions[self.action_index], diceset, mode_vars, debug);
+			self._execute_action(self.actions[self._action_index], diceset, mode_vars, debug);
 
 			# Move to next action
-			self.action_index += 1;
+			self._action_index += 1;
 
-			if self.action_index >= len(self.actions):
+			if self._action_index >= len(self.actions):
 				# If the end of the action list is hit, and we are in a loop, go back to loop_entry
-				if self.loop_entry is not None:
-					self.action_index = self.loop_entry;
+				if self._loop_entry is not None:
+					self._action_index = self._loop_entry;
 				else:
-					self.done = True;
+					self._done = True;
 
 		if debug:
 			print(mode_vars);
 
 		if capture_print:
-			mode_vars["output"] = self.output.getvalue();
+			mode_vars["output"] = self._output.getvalue();
 
-			self.output = sys.stdout;
+			self._output = sys.stdout;
 
 		return mode_vars;
 
 
 	def _execute_action(self, line: str, diceset: DiceSet, mode_vars: dict[str, Any], debug: bool = False) -> None:
-		if self.loop_entry is not None:
+		if self._loop_entry is not None:
 			# If we are in a loop and the action index is greater than loop_end, go back to loop_entry
-			if self.action_index > self.loop_end:
-				self.action_index = self.loop_entry;
+			if self._action_index > self._loop_end:
+				self._action_index = self._loop_entry;
 
-				line = self.actions[self.action_index];
+				line = self.actions[self._action_index];
 
 		clean_line: str = line.lstrip();
 
 		if debug:
-			print(f"Executing action #{self.action_index} '{clean_line}'", file=self.output);
+			print(f"Executing action #{self._action_index} '{clean_line}'", file=self._output);
 
 		# Execute the func associated with the action on the current line
 		for action, func in self._Actions.items():
