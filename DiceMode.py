@@ -5,6 +5,9 @@ from typing import Any, Callable, TextIO;
 
 from DiceSet import DiceSet, DiceError, Comparisons, Calculations;
 
+# Tab character for use in f-strings
+Tab: str = "\t";
+
 
 class DiceMode:
 	def _store(self, action: str, _diceset: DiceSet, mode_vars: dict[str, Any], debug: bool = False):
@@ -474,3 +477,12 @@ class DiceMode:
 				func(self, line, diceset, mode_vars, debug);
 
 				continue;
+
+
+	def __str__(self) -> str:
+		builder: list[str] = [f"dicemode({self.name}):", ];
+
+		for action in self.actions:
+			builder.append(f"{Tab}{action}");
+
+		return "\n".join(builder);
