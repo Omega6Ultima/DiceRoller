@@ -166,12 +166,17 @@ def switch_dicemode(app_state: AppState, mode: str = "") -> str:
 def inspect_dicemode(app_state: AppState, mode: str = "") -> str:
 	"""Outputs the action list for the given dicemode"""
 	if mode in app_state["dicemodes"]:
-		return "\n" + ("\n".join(app_state["dicemodes"][mode].actions));
+		mode_str: str = str(app_state["dicemodes"][mode]);
+
+		if app_state["options"].mode == "discord":
+			mode_str = mode_str.replace("\t", "-");
+
+		return "\n" + mode_str;
 
 	return f"No dicemode named '{mode}'";
 
 
-def submit_dicemode(app_state: AppState, text: str = "") -> bool:
+def submit_dicemode(app_state: AppState, text: str = "") -> str:
 	"""Enter a mode-dependant submit (sub)mode, returns whether a dicemode was added"""
 	match app_state["options"].mode:
 		case "active" | "auto":
@@ -184,7 +189,7 @@ def submit_dicemode(app_state: AppState, text: str = "") -> bool:
 				name = input("Enter a name for the new dicemode: ");
 
 				if name == "":
-					return False;
+					return "";
 
 				if name in app_state["dicemodes"]:
 					print(f"A dicemode named '{name}' already exists");
@@ -198,19 +203,52 @@ def submit_dicemode(app_state: AppState, text: str = "") -> bool:
 
 				if line == "":
 					submit_done = True;
-
-				action_list.append(line);
+				else:
+					action_list.append(line);
 
 			if name and action_list:
-				app_state["dicemodes"][name] = DiceMode(name, action_list);
+				dice: str = input("Enter a dice string to validate the Dicemode");
+				dm: DiceMode = DiceMode(name, action_list);
+				valid: tuple[bool, str] = dm.validate(dice);
 
-				return True;
-			else:
-				return False;
+				if valid[0]:
+					app_state["dicemodes"][name] = dm;
+
+					return "";
+				else:
+					return f"Dicemode failed validation ({valid[1]})";
+
+			return "";
 		case "discord":
-			return False;
+			# print(f"'{text}'");
+
+			lines: list[str] = text.split("\n");
+
+			if lines and lines[0].startswith("dicemode"):
+				name: str = lines[0].removeprefix("dicemode").strip("():");
+				actions: list[str] = [];
+
+				if name in app_state["dicemodes"]:
+					return f"A dicemode named '{name}' already exists";
+
+				for line in lines[1:-1]:
+					actions.append(line.replace("-", "\t").removeprefix("\t"));
+
+				if name and actions:
+					dice: str = lines[-1].strip();
+					dm: DiceMode = DiceMode(name, actions);
+					valid: tuple[bool, str] = dm.validate(dice);
+
+					if valid[0]:
+						app_state["dicemodes"][name] = dm;
+
+						return "";
+					else:
+						return f"Dicemode failed validation ({valid[1]})";
+
+			return "";
 		case _:
-			return False;
+			return "submit command ran under unknown mode";
 
 
 def toss_coins(_app_state: AppState, num: str = "1") -> str:
@@ -254,8 +292,20 @@ Commands:
 {Tab}dicemodes{Tab * 3}list available dicemodes
 {Tab}dicemode <mode>{Tab * 2}switch to <mode> dicemode, all subsequent rolls with be processed through that dicemode
 {Tab}inspect <mode>{Tab * 2}print the action list for given dicemode
-{Tab}submit{f' <text>{Tab * 2}' if mode == 'discord' else f'{Tab * 4}'}submit a new dicemode
+{Tab}submit{f' <text>{Tab * 2}' if mode == 'discord' else f'{Tab * 4}'}submit a new dicemode{f''', lines after the dicemode name must be started with '-', use multiple '-' for indent levels, last line should be dice used to validate the dicemode'''}
 {Tab}count <dice>{Tab * 2}roll the 'dice' and count each roll result and display the statistics
+{f'''Example submit:
+{Tab}submit dicemode(1_nova):
+{Tab}-store(0, zero)
+{Tab}-store(1, one)
+{Tab}-roll(dice)
+{Tab}-count(eq, 1, ones)
+{Tab}-while(ones, gt, zero)
+{Tab}--roll(dice)
+{Tab}--calc(ones, sub, one)
+{Tab}-total(sum)
+{Tab}-print(sum)
+{Tab}5d4''' if mode == "discord" else ""}
 Dice rolls:
 {Tab}1d4{Tab * 5}roll a 1d4
 {Tab}1d6+1{Tab * 4}roll a 1d6 and add 1
@@ -372,6 +422,11 @@ async def process_input(text_in: str, app_state: AppState) -> str:
 
 		if any([text.lower().startswith(key) for key in Commands]):
 			# Process commands
+			# Special case, discord mode submitting dicemodes will probably have commas incorrectly split of above
+			if app_state["options"].mode == "discord" and text.lower().startswith("submit"):
+				text = ",".join(texts);
+				texts.clear();
+
 			args: list[str] = text.split(" ");
 			cmd_output: None | str;
 
@@ -380,8 +435,10 @@ async def process_input(text_in: str, app_state: AppState) -> str:
 			else:
 				cmd_output = Commands[args[0].lower()](app_state, *args[1:]);
 
-			if cmd_output is not None:
+			if cmd_output:
 				output.append(f"{text} => {cmd_output}");
+			if not cmd_output and args[0].lower() == "submit":
+				output.append("Dicemode submitted successfully");
 		elif DiceSet.is_dice(text):
 			# Process dice
 			try:
