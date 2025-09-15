@@ -576,11 +576,6 @@ def main() -> int:
 		# Run client
 		client.run(os.getenv("BOT_TOKEN"), log_handler=log_handler);
 
-	"""
-dicemode(Test):
-    roll(dice)
-    total(sum)
-    print(sum)"""
 	if any([d not in DefaultDicemodes for d in app_state["dicemodes"]]):
 		with open("dicemodes_user.txt", "w") as outfile:
 			for name, mode in app_state["dicemodes"].items():
