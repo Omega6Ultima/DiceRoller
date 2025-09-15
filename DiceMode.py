@@ -268,12 +268,23 @@ class DiceMode:
 
 			self._loop_end = loop_end - 1;
 
+			# Set loop counter here
+			self._loop_counter = 0;
+
 		if debug:
 			print(f"  Looping while '{var1} {comp} {var2}' from action #{self._action_index} to #{self._loop_end}", file=self._output);
 			print(f"  {mode_vars[var1]} {comp} {mode_vars[var2]} = {Comparisons[comp](mode_vars[var1], mode_vars[var2])}", file=self._output);
 
 		if Comparisons[comp](mode_vars[var1], mode_vars[var2]):
+			# This is good enough for an infinite loop detection
+			# Since nested while loops would break everything else, don't need to handle it here
+			if self._loop_counter > 10_000:
+				self._done = True;
+
+				print(f"While loop might be in an infinite loop. Forcing exit", file=self._output);
+
 			self._loop_entry = self._action_index;
+			self._loop_counter += 1;
 		else:
 			self._action_index = self._loop_end;
 			self._loop_entry = None;
@@ -336,6 +347,7 @@ class DiceMode:
 		self._done: bool = False;
 		self._loop_entry: None | int = None;
 		self._loop_end: None | int = None;
+		self._loop_counter: int = 0;
 		self._output: TextIO | StringIO = sys.stdout;
 
 
