@@ -223,6 +223,8 @@ class DiceSetTest(unittest.TestCase):
 		self.assertTrue(DiceSet.is_dice("4*2.5d6+1"));
 		self.assertTrue(DiceSet.is_dice("2.5d6+10{1}"));
 		self.assertTrue(DiceSet.is_dice("2.5d6-10[>=6]"));
+		self.assertTrue(DiceSet.is_dice("8d4+3<red>"));
+		self.assertTrue(DiceSet.is_dice("8d5+1<blue>"));
 		self.assertFalse(DiceSet.is_dice("10+10"));
 		self.assertFalse(DiceSet.is_dice("d=10"));
 		self.assertFalse(DiceSet.is_dice("d20"));
@@ -241,8 +243,9 @@ class DiceSetTest(unittest.TestCase):
 		self.assertEqual(dice.mul_mod, None);
 		self.assertEqual(dice.reroll_mod, None);
 		self.assertEqual(dice.remove_mod, None);
+		self.assertEqual(dice.color, None);
 
-		dice = DiceSet.from_str("4*3d8+7{1}");
+		dice = DiceSet.from_str("4*3d8+7{1}<yellow>");
 
 		self.assertEqual(dice.num_dice, 3);
 		self.assertEqual(dice.dice_sides, 8);
@@ -250,11 +253,12 @@ class DiceSetTest(unittest.TestCase):
 		self.assertEqual(dice.mul_mod, 4);
 		self.assertEqual(dice.reroll_mod, ("==", 1));
 		self.assertEqual(dice.remove_mod, None);
+		self.assertEqual(dice.color, "yellow");
 
 		self.assertEqual(len(dice.sub_dice), 3);
 		self.assertEqual(dice.sub_dice[0], dice.sub_dice[1]);
 
-		dice = DiceSet.from_str("4*3d8+7[1]");
+		dice = DiceSet.from_str("4*3d8+7[1]<light_yellow>");
 
 		self.assertEqual(dice.num_dice, 3);
 		self.assertEqual(dice.dice_sides, 8);
@@ -262,6 +266,7 @@ class DiceSetTest(unittest.TestCase):
 		self.assertEqual(dice.mul_mod, 4);
 		self.assertEqual(dice.reroll_mod, None);
 		self.assertEqual(dice.remove_mod, ("==", 1));
+		self.assertEqual(dice.color, "light_yellow");
 
 		self.assertEqual(len(dice.sub_dice), 3);
 		self.assertEqual(dice.sub_dice[0], dice.sub_dice[1]);
@@ -293,5 +298,9 @@ class DiceSetTest(unittest.TestCase):
 			DiceSet(1, 20, remove=">0");
 
 		with self.assertRaises(DiceError):
-			# Remove mod would remove all values
+			# Invalid dice string
 			DiceSet.from_str("I am not a die");
+
+		with self.assertRaises(DiceError):
+			# Invalid color modifier
+			DiceSet(1, 20, color="blellow");

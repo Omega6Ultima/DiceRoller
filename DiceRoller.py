@@ -14,7 +14,7 @@ import playsound3;
 
 import RollerUtils;
 from DiceMode import DiceMode;
-from DiceSet import DiceError, DiceSet;
+from DiceSet import Colors, DiceError, DiceSet;
 from Rdp import Rdp;
 
 # Tab character for use in f-strings
@@ -136,7 +136,7 @@ def get_help(app_state: AppState, context: str = "") -> str:
 			return DicemodeHelpStr;
 		case _:
 			# Use mode to tailor general help, i.e. exit and timer don't do anything in discord mode
-			return eval_fstr(HelpStr, Tab=Tab, mode=app_state['options'].mode);
+			return eval_fstr(HelpStr, Tab=Tab, mode=app_state['options'].mode, Colors=Colors);
 
 
 def start_timer(app_state: AppState, seconds: str = "", sound: str = "alarm-clock-1.wav") -> str:
@@ -319,6 +319,8 @@ Dice rolls:
 {Tab}3d20[>=16]{Tab * 3}roll 3d20 and remove any rolls matching the condition
 {Tab}3d20[low]{Tab * 3}roll 3d20 and remove the lowest roll
 {Tab}3d20[high]{Tab * 3}roll 3d20 and remove the highest roll
+{Tab}2d6<red>{Tab * 3}roll 2d6 and display the dice in red text
+{Tab * 2}Possible colors are {', '.join(Colors.keys())}
 Math expressions:
 {Tab}10 + 14{Tab * 4}addition
 {Tab}54 - 19{Tab * 4}subtraction
