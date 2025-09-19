@@ -1,6 +1,7 @@
 import random;
 import re;
 from typing import Callable;
+from colorama import Fore as ForeColor, Back as BackColor;
 
 import RollerUtils;
 
@@ -32,6 +33,25 @@ Calculations: dict[str, Callable] = {
 	"mul": lambda a, b: a * b,
 	"div": lambda a, b: a / b,
 };
+# Color strings to colorama constants
+Colors: dict[str, str] = {
+	"white": ForeColor.WHITE,
+	"black": ForeColor.BLACK,
+	"red": ForeColor.RED,
+	"green": ForeColor.GREEN,
+	"blue": ForeColor.BLUE,
+	"cyan": ForeColor.CYAN,
+	"yellow": ForeColor.YELLOW,
+	"magenta": ForeColor.MAGENTA,
+	"light_white": ForeColor.LIGHTWHITE_EX,
+	"light_black": ForeColor.LIGHTBLACK_EX,
+	"light_red": ForeColor.LIGHTRED_EX,
+	"light_green": ForeColor.LIGHTGREEN_EX,
+	"light_blue": ForeColor.LIGHTBLUE_EX,
+	"light_cyan": ForeColor.LIGHTCYAN_EX,
+	"light_yellow": ForeColor.LIGHTYELLOW_EX,
+	"light_magenta": ForeColor.LIGHTMAGENTA_EX,
+};
 
 
 class DiceError(Exception):
@@ -54,9 +74,18 @@ class DiceSet:
 											(?:									# one of (or none)
 											(\{(?:[<>=]*\d+ | low | high)})? |	# optional reroll modifier
 											(\[(?:[<>=]*\d+ | low | high)])?	# optional remove modifier
-											)?""", re.X);
+											)?
+											(<\w{3,13}>)?						# optional color modifier
+											""", re.X);
 
-	def __init__(self, num_dice: float, dice_sides: int, mul: None | int = None, add: None | int = None, reroll: None | str = None, remove: None | str = None):
+	def __init__(self,
+				 num_dice: float,
+				 dice_sides: int,
+				 mul: None | int = None,
+				 add: None | int = None,
+				 reroll: None | str = None,
+				 remove: None | str = None,
+				 color: None | str = None):
 		self.num_dice: float = num_dice;
 		self.dice_sides: int = dice_sides;
 
@@ -64,6 +93,7 @@ class DiceSet:
 		self.add_mod: int = add if add else 0;
 		self.reroll_mod: None | tuple[str, int] = None;
 		self.remove_mod: None | tuple[str, int] = None;
+		self.color: None | str = None;
 
 		self.result: None | list[int] = None;
 		self.sub_dice: None | list[DiceSet] = None;
@@ -116,6 +146,13 @@ class DiceSet:
 				if Comparisons[self.remove_mod[0]](1, self.remove_mod[1]) and Comparisons[self.remove_mod[0]](self.dice_sides, self.remove_mod[1]):
 					raise DiceError(f"Remove modifier '{self.remove_mod[0]}{self.remove_mod[1]}' would remove all possible values");
 
+		if color:
+			if color not in Colors:
+				raise DiceError(f"Invalid color passed '{color}'");
+
+			self.color = color;
+
+		# Populate sub_dice
 		if self.mul_mod is not None:
 			self.sub_dice = [];
 
@@ -148,6 +185,11 @@ class DiceSet:
 				mul, num_dice = num_dice.split("*");
 
 				mods["mul"] = int(mul);
+
+			if "<" in dice_side:
+				dice_side, col = dice_side.split("<");
+
+				mods["color"] = col.strip("<>");
 
 			if "{" in dice_side:
 				dice_side, reroll = dice_side.split("{");
@@ -290,6 +332,9 @@ class DiceSet:
 		if self.result is None:
 			self.process();
 
+		if self.color:
+			builder.append(Colors[self.color]);
+
 		builder.append(f"{self.result}");
 
 		if self.add_mod:
@@ -306,6 +351,9 @@ class DiceSet:
 				builder.append(f", {dice_str[:dice_str.find("=") - 1]}");
 
 		builder.append(f" = {int(self)}");
+
+		if self.color:
+			builder.append(ForeColor.RESET);
 
 		return "".join(builder);
 

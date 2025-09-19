@@ -4,7 +4,7 @@ import unittest;
 from typing_extensions import override;
 
 import RollerUtils;
-from DiceSet import DiceError, DiceSet;
+from DiceSet import Colors, DiceError, DiceSet;
 
 
 class DiceSetTest(unittest.TestCase):
@@ -176,6 +176,28 @@ class DiceSetTest(unittest.TestCase):
 			self._common_asserts(result[0], 20);
 
 			self.assertLessEqual(len(result[0][0]), 1000, msg=f"Remove mod resulted in more rolls than original, should be less than {num_dice}, is incorrect value of {len(result[0][0])}");
+
+
+	def test_color(self):
+		test_colors: list[str] = [key for key in Colors];
+
+		for col in test_colors:
+			dice: DiceSet = DiceSet(6, 8, add=4, color=col);
+
+			self.assertIsNotNone(dice);
+
+			print(f"This should be {col}", dice);
+
+
+	def test_color2(self):
+		test_colors: list[str] = [key for key in Colors];
+
+		for col in test_colors:
+			dice: DiceSet = DiceSet.from_str(f"6d8+4<{col}>");
+
+			self.assertIsNotNone(dice);
+
+			print(f"This should be {col}", dice);
 
 
 	def test_is_dice(self):
